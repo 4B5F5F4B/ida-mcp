@@ -22,8 +22,9 @@ import sys
 from importlib.metadata import version
 import idaapi, ida_bytes, ida_funcs, ida_name, ida_typeinf
 from ida_domain.types import TypeKind
-assert __import__("ida_domain").__version__ == "0.5.1+ida80.2", "Wrong ida-domain fork loaded"
-assert version("ida-nexus") == "0.13.4+ida80.2", "Wrong ida-nexus fork loaded"
+from ida_domain.xrefs import XrefsFlags
+assert __import__("ida_domain").__version__ == "0.5.1+ida80.3", "Wrong ida-domain fork loaded"
+assert version("ida-nexus") == "0.13.4+ida80.3", "Wrong ida-nexus fork loaded"
 
 functions = list(db.functions)
 assert functions, "The test binary must contain analyzed functions"
@@ -48,6 +49,17 @@ segments = list(db.segments)
 assert segments, "No segments"
 strings = list(db.strings)
 xrefs = list(db.xrefs.to_ea(ea))
+xref_filter_checks = 0
+for iterate in (db.xrefs.to_ea, db.xrefs.from_ea):
+    all_refs = list(iterate(ea))
+    for flags, expected in (
+        (XrefsFlags.CODE, [ref for ref in all_refs if ref.is_code]),
+        (XrefsFlags.DATA, [ref for ref in all_refs if not ref.is_code]),
+        (XrefsFlags.NOFLOW, [ref for ref in all_refs if not ref.is_flow]),
+        (XrefsFlags.CODE_NOFLOW, [ref for ref in all_refs if ref.is_code and not ref.is_flow]),
+    ):
+        assert list(iterate(ea, flags)) == expected, f"Xref filter failed: {flags}"
+        xref_filter_checks += 1
 named_types = list(db.types.get_all())
 numbered_types = list(db.types.get_all(type_kind=TypeKind.NUMBERED))
 tif = db.types.parse_one_declaration(None, "int __cdecl ida80_probe(int value);")
@@ -82,6 +94,7 @@ report = {
     "byte_search": {"first_match": ea, "all_match_count": len(byte_matches)},
     "operand_paths_read": len(operands),
     "function_type_arguments": len(arguments),
+    "xref_filter_checks": xref_filter_checks,
 }
 report
 """

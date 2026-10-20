@@ -21,6 +21,7 @@
   },
   "operand_paths_read": 2,
   "function_type_arguments": 1,
+  "xref_filter_checks": 8,
   "save": {
     "path": "D:\\code\\ida-mcp\\.compat-research\\sample.exe.i64"
   },

@@ -128,19 +128,20 @@ class XrefType(IntEnum):
     def _get_code_refs(cls) -> Set['XrefType']:
         """Get set of code reference types (cached)."""
         return {
-            cls.CALL_FAR,
-            cls.CALL_NEAR,
-            cls.JUMP_FAR,
-            cls.JUMP_NEAR,
-            cls.USER_SPECIFIED,
-            cls.ORDINARY_FLOW,
+            member for name in (
+                'CALL_FAR', 'CALL_NEAR', 'JUMP_FAR', 'JUMP_NEAR',
+                'USER_SPECIFIED', 'ORDINARY_FLOW',
+            ) if (member := getattr(cls, name, None)) is not None
         }
 
     @classmethod
     @functools.lru_cache(maxsize=1)
     def _get_data_refs(cls) -> Set['XrefType']:
         """Get set of data reference types (cached)."""
-        return {cls.OFFSET, cls.WRITE, cls.READ, cls.TEXT, cls.INFORMATIONAL, cls.SYMBOLIC}
+        return {
+            member for name in ('OFFSET', 'WRITE', 'READ', 'TEXT', 'INFORMATIONAL', 'SYMBOLIC')
+            if (member := getattr(cls, name, None)) is not None
+        }
 
     def is_code_ref(self) -> bool:
         """Check if this is a code reference."""
@@ -152,37 +153,45 @@ class XrefType(IntEnum):
 
 
 class XrefsFlags(IntFlag):
-    """Flags for xref iteration control."""
+    """Domain xref filters, translated to the flags supported by the SDK."""
 
     ALL = 0
     """Default - all xrefs"""
-    if hasattr(ida_xref, 'XREF_NOFLOW'):
-        NOFLOW = ida_xref.XREF_NOFLOW
+    NOFLOW = (
+        ida_xref.XREF_NOFLOW if hasattr(ida_xref, 'XREF_NOFLOW')
+        else ida_xref.XREF_FAR
+    )
     """Skip ordinary flow xrefs"""
-    if hasattr(ida_xref, 'XREF_DATA'):
-        DATA = ida_xref.XREF_DATA
+    DATA = ida_xref.XREF_DATA
     """Return only data references"""
-    if hasattr(ida_xref, 'XREF_CODE'):
-        CODE = ida_xref.XREF_CODE
+    # On IDA 8 this bit belongs only to our Python filter. It must never be
+    # passed to the native iterator as an unsupported SDK constant.
+    CODE = getattr(ida_xref, 'XREF_CODE', 4)
     """Return only code references"""
 
     CODE_NOFLOW = CODE | NOFLOW
     """Code xrefs without flow"""
 
     def to_ida_flags(self) -> int:
-        """Convert to IDA's xref flags."""
-        if self == XrefsFlags.ALL:
-            return ida_xref.XREF_ALL
-        ida_flags = 0
+        """Return supported native flags; code-only fallback filters in Python."""
+        ida_flags = ida_xref.XREF_ALL
         if self & XrefsFlags.NOFLOW:
-            ida_flags |= ida_xref.XREF_NOFLOW
+            ida_flags |= int(XrefsFlags.NOFLOW)
         if self & XrefsFlags.DATA:
             ida_flags |= ida_xref.XREF_DATA
         elif self & XrefsFlags.CODE:
-            ida_flags |= ida_xref.XREF_CODE
-        else:
-            ida_flags = ida_xref.XREF_ALL
+            ida_flags |= getattr(ida_xref, 'XREF_CODE', 0)
         return ida_flags
+
+    def _accepts(self, xb: ida_xref.xrefblk_t) -> bool:
+        if self & XrefsFlags.NOFLOW and xb.iscode and xb.type == ida_xref.fl_F:
+            return False
+        # Preserve the existing precedence of DATA over CODE if both are set.
+        if self & XrefsFlags.DATA:
+            return not xb.iscode
+        if self & XrefsFlags.CODE:
+            return bool(xb.iscode)
+        return True
 
 
 def _make_xref_info(xb: ida_xref.xrefblk_t) -> XrefInfo:
@@ -202,7 +211,8 @@ def _iter_xrefs_to(ea: ea_t, flags: XrefsFlags) -> Iterator[XrefInfo]:
     xb = ida_xref.xrefblk_t()
     ok = xb.first_to(ea, flags.to_ida_flags())
     while ok:
-        yield _make_xref_info(xb)
+        if flags._accepts(xb):
+            yield _make_xref_info(xb)
         ok = xb.next_to()
 
 
@@ -215,7 +225,8 @@ def _iter_xrefs_from(ea: ea_t, flags: XrefsFlags) -> Iterator[XrefInfo]:
     xb = ida_xref.xrefblk_t()
     ok = xb.first_from(ea, flags.to_ida_flags())
     while ok:
-        yield _make_xref_info(xb)
+        if flags._accepts(xb):
+            yield _make_xref_info(xb)
         ok = xb.next_from()
 
 

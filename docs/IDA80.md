@@ -20,6 +20,13 @@ The `ida80.2` revision fixes the reported IDA 8 startup failure
 a package-local `int` alias, including the hook definitions evaluated at
 import time. Startup failures also print a complete traceback.
 
+The `ida80.3` revision fixes `NameError: name 'CODE' is not defined` during
+the import of `xrefs.py`. Its xref filters use the legacy `XREF_FAR` flag
+when `XREF_NOFLOW` is absent. On SDKs without `XREF_CODE`, code-only
+selection happens in Python; the private filter bit is never passed to
+the native iterator. Optional symbolic/obsolete reference kinds no
+longer break classification when the SDK does not define them.
+
 When updating an existing install, close IDA, run `git pull --ff-only`,
 then repeat `uv sync --locked` and `uv run python scripts/install_ida80.py`.
 Restart IDA afterwards. Pulling the repository alone does not replace
@@ -143,6 +150,8 @@ inputs needed to continue the remaining real-runtime compatibility fixes.
 - Domain tolerates the absent `is_ida_library()` API in IDA 8.
 - Address annotations use a local `ea_t = int` alias; IDAPython 8 is not
   required to export the newer `ida_idaapi.ea_t` name.
+- Code/data/flow xref filters support both old and new SDK flags. Applying
+  `NOFLOW` alone also preserves its native flag instead of resetting it.
 - IDAPython 8's `udt_member_t` and `enum_member_t` get local aliases for
   the newer record names; the SDK modules are not monkeypatched.
 - Byte search uses IDA 8's compiled-pattern overload when `find_bytes`

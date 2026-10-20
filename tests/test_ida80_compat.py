@@ -100,6 +100,113 @@ def test_plugin_start_failure_includes_traceback():
     assert "fail_start" in messages[0]
 
 
+@pytest.mark.parametrize("modern", [False, True])
+def test_xref_module_import_and_filters_on_old_and_new_sdks(monkeypatch, modern):
+    sdk: Any = types.ModuleType("ida_xref")
+    sdk.XREF_ALL, sdk.XREF_FAR, sdk.XREF_DATA = 0, 1, 2
+    sdk.fl_CF, sdk.fl_CN, sdk.fl_JF, sdk.fl_JN, sdk.fl_F = 16, 17, 18, 19, 21
+    sdk.dr_O, sdk.dr_W, sdk.dr_R, sdk.dr_T, sdk.dr_I = 1, 2, 3, 4, 5
+    if modern:
+        sdk.XREF_NOFLOW, sdk.XREF_CODE, sdk.dr_S, sdk.fl_USobsolete = 1, 4, 6, 20
+    calls = []
+    # Ordered mixed references: ordinary flow, data read, call, data offset.
+    records = [(True, 21), (False, 3), (True, 17), (False, 1)]
+
+    class XrefBlock:
+        def start(self, direction, ea, flags):
+            assert flags & ~(7 if modern else 3) == 0
+            calls.append((direction, flags))
+            self.rows = []
+            for index, (iscode, kind) in enumerate(records):
+                if flags & 1 and kind == 21:
+                    continue
+                if flags & 2 and iscode:
+                    continue
+                if modern and flags & 4 and not iscode:
+                    continue
+                other = ea + index + 1
+                self.rows.append(
+                    (ea, other, iscode, kind)
+                    if direction == "from"
+                    else (other, ea, iscode, kind)
+                )
+            self.index = -1
+            return self.advance()
+
+        def advance(self):
+            self.index += 1
+            if self.index >= len(self.rows):
+                return False
+            self.frm, self.to, self.iscode, self.type = self.rows[self.index]
+            self.user = False
+            return True
+
+        def first_to(self, ea, flags):
+            return self.start("to", ea, flags)
+
+        def first_from(self, ea, flags):
+            return self.start("from", ea, flags)
+
+        next_to = advance
+        next_from = advance
+
+    sdk.xrefblk_t = XrefBlock
+    monkeypatch.setitem(sys.modules, "ida_xref", sdk)
+    for name in (
+        "ida_bytes",
+        "ida_frame",
+        "ida_funcs",
+        "ida_kernwin",
+        "ida_lines",
+        "ida_nalt",
+        "ida_typeinf",
+        "ida_idaapi",
+    ):
+        monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
+    vars(sys.modules["ida_funcs"])["func_t"] = type("func_t", (), {})
+    vars(sys.modules["ida_idaapi"])["BADADDR"] = (1 << 64) - 1
+    vars(sys.modules["ida_kernwin"])["get_kernel_version"] = lambda: (
+        "9.5" if modern else "8.0"
+    )
+    package = types.ModuleType("_ida_xref_test")
+    package.__path__ = [str(DOMAIN)]
+    monkeypatch.setitem(sys.modules, package.__name__, package)
+    loaded = {}
+    for name in ("_compat_typing", "base", "xrefs"):
+        spec = importlib.util.spec_from_file_location(
+            package.__name__ + "." + name, DOMAIN / (name + ".py")
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        monkeypatch.setitem(sys.modules, spec.name, module)
+        spec.loader.exec_module(module)
+        loaded[name] = module
+    module = loaded["xrefs"]
+    flags = module.XrefsFlags
+    cases = [
+        (flags.ALL, [21, 3, 17, 1], 0),
+        (flags.NOFLOW, [3, 17, 1], 1),
+        (flags.DATA, [3, 1], 2),
+        (flags.CODE, [21, 17], 4 if modern else 0),
+        (flags.CODE_NOFLOW, [17], 5 if modern else 1),
+        (flags.DATA | flags.NOFLOW, [3, 1], 3),
+        (flags.DATA | flags.CODE, [3, 1], 2),
+    ]
+    for direction in ("to", "from"):
+        iterate = getattr(module, "_iter_xrefs_" + direction)
+        for flag, expected, native_flags in cases:
+            result = list(iterate(0x1000, flag))
+            assert [int(item.type) for item in result] == expected
+            assert calls[-1] == (direction, native_flags)
+            for item in result:
+                assert item.type.is_code_ref() == item.is_code
+                assert item.type.is_data_ref() != item.is_code
+    if not modern:
+        assert not hasattr(sdk, "XREF_CODE")
+        assert not hasattr(sdk, "XREF_NOFLOW")
+        assert not hasattr(sdk, "dr_S")
+
+
 @pytest.mark.parametrize(
     "probe, expected", [(None, False), (False, False), (True, True)]
 )

@@ -1,0 +1,20 @@
+{
+  "kernel": "9.5",
+  "ida80_execution": false,
+  "domain_version": "0.5.1+ida80.3",
+  "simulated_missing_symbols": [
+    "ida_idaapi.ea_t",
+    "ida_xref.XREF_CODE",
+    "ida_xref.XREF_NOFLOW",
+    "ida_xref.dr_S",
+    "ida_xref.fl_USobsolete"
+  ],
+  "full_domain_import": true,
+  "filter_checks": 512,
+  "observed_xref_kinds": [
+    "code",
+    "data",
+    "flow"
+  ],
+  "success": true
+}
