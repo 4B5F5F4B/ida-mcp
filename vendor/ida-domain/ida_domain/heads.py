@@ -6,7 +6,7 @@ import ida_bytes
 import ida_ida
 import ida_idaapi
 import idc
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, Iterator, Optional
 
 from .base import (

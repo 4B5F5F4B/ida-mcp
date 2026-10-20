@@ -22,8 +22,8 @@ import sys
 from importlib.metadata import version
 import idaapi, ida_bytes, ida_funcs, ida_name, ida_typeinf
 from ida_domain.types import TypeKind
-assert __import__("ida_domain").__version__ == "0.5.1+ida80.1", "Wrong ida-domain fork loaded"
-assert version("ida-nexus") == "0.13.4+ida80.1", "Wrong ida-nexus fork loaded"
+assert __import__("ida_domain").__version__ == "0.5.1+ida80.2", "Wrong ida-domain fork loaded"
+assert version("ida-nexus") == "0.13.4+ida80.2", "Wrong ida-nexus fork loaded"
 
 functions = list(db.functions)
 assert functions, "The test binary must contain analyzed functions"

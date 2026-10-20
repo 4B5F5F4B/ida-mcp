@@ -7,7 +7,7 @@ from enum import IntEnum
 import ida_bytes
 import ida_nalt
 import ida_strlist
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, Iterator, Optional, Tuple, Union
 
 from .base import (

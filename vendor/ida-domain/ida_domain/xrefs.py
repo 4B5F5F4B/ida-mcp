@@ -14,7 +14,8 @@ import ida_nalt
 import ida_typeinf
 import ida_xref
 from ida_funcs import func_t
-from ida_idaapi import BADADDR, ea_t
+from ida_idaapi import BADADDR
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Set, Tuple, Union
 
 from .base import (

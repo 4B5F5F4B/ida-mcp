@@ -21,7 +21,7 @@ from .base import (
 from .operands import Operand, OperandFactory
 
 if TYPE_CHECKING:
-    from ida_idaapi import ea_t
+    from ._compat_typing import ea_t
 
     from .database import Database
 

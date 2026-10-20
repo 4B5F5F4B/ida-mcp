@@ -15,6 +15,16 @@ Actual IDA 8.0 execution has **not yet been verified**. That installation
 is on another computer. Local mock tests only establish specific SDK
 fallback contracts; they are not an IDA 8 emulator.
 
+The `ida80.2` revision fixes the reported IDA 8 startup failure
+`cannot import name 'ea_t' from 'ida_idaapi'`. Address annotations now use
+a package-local `int` alias, including the hook definitions evaluated at
+import time. Startup failures also print a complete traceback.
+
+When updating an existing install, close IDA, run `git pull --ff-only`,
+then repeat `uv sync --locked` and `uv run python scripts/install_ida80.py`.
+Restart IDA afterwards. Pulling the repository alone does not replace
+the dependency copies already installed in its plugin directory.
+
 ## Install on the IDA 8 computer
 
 Copy this entire checkout, including `vendor`, to the other computer.
@@ -131,6 +141,8 @@ inputs needed to continue the remaining real-runtime compatibility fixes.
   variable and explicitly excludes idalib.
 - Nexus's Python 3.11 `Self` imports use the Python 3.10 backport.
 - Domain tolerates the absent `is_ida_library()` API in IDA 8.
+- Address annotations use a local `ea_t = int` alias; IDAPython 8 is not
+  required to export the newer `ida_idaapi.ea_t` name.
 - IDAPython 8's `udt_member_t` and `enum_member_t` get local aliases for
   the newer record names; the SDK modules are not monkeypatched.
 - Byte search uses IDA 8's compiled-pattern overload when `find_bytes`

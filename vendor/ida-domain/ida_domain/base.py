@@ -7,7 +7,7 @@ from collections.abc import Callable
 from enum import EnumMeta
 
 import ida_kernwin
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from packaging.version import Version
 from typing_extensions import TYPE_CHECKING, Any, Dict, Optional, ParamSpec, Tuple, TypeVar, cast
 

@@ -12,7 +12,8 @@ import ida_lines
 import ida_name
 import ida_offset
 import ida_ua
-from ida_idaapi import as_signed, ea_t
+from ida_idaapi import as_signed
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING
 
 from .base import InvalidParameterError

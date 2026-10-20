@@ -35,7 +35,7 @@ from .base import (
 
 if TYPE_CHECKING:
     from ida_hexrays import ivlset_t, valrng_t, vdloc_t, vivl_t
-    from ida_idaapi import ea_t
+    from ._compat_typing import ea_t
     from ida_typeinf import argloc_t, tinfo_t
 
     from .database import Database

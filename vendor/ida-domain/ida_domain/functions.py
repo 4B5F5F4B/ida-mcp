@@ -11,7 +11,8 @@ import ida_lines
 import ida_name
 import ida_typeinf
 from ida_funcs import func_t
-from ida_idaapi import BADADDR, ea_t
+from ida_idaapi import BADADDR
+from ._compat_typing import ea_t
 from ida_ua import insn_t
 from typing_extensions import TYPE_CHECKING, Any, Iterator, List, Optional
 

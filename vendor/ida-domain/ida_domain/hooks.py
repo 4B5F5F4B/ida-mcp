@@ -1,7 +1,7 @@
 # type: ignore
 import logging
 
-import ida_idaapi
+from ._compat_typing import ea_t
 from ida_dbg import DBG_Hooks
 from ida_hexrays import Hexrays_Hooks
 from ida_idp import IDB_Hooks, IDP_Hooks
@@ -148,8 +148,8 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
         self,
         filename: 'char *',
         fileoff: 'qoff64_t',
-        basepara: 'ida_idaapi.ea_t',
-        binoff: 'ida_idaapi.ea_t',
+        basepara: 'ea_t',
+        binoff: 'ea_t',
         nbytes: 'uint64',
     ) -> int:
         """
@@ -469,7 +469,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_moving_segm(
         self,
         seg: 'segment_t *',
-        to: ida_idaapi.ea_t,
+        to: ea_t,
         flags: int,
     ) -> int:
         """
@@ -487,7 +487,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_coagulate(
         self,
-        start_ea: ida_idaapi.ea_t,
+        start_ea: ea_t,
     ) -> int:
         """
         Try to define some unexplored bytes.
@@ -506,7 +506,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_undefine(
         self,
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
     ) -> int:
         """
         An item in the database (instruction or data) is being deleted.
@@ -521,9 +521,9 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_treat_hindering_item(
         self,
-        hindering_item_ea: ida_idaapi.ea_t,
+        hindering_item_ea: ea_t,
         new_item_flags: 'flags64_t',
-        new_item_ea: ida_idaapi.ea_t,
+        new_item_ea: ea_t,
         new_item_length: 'asize_t',
     ) -> int:
         """
@@ -548,7 +548,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_rename(
         self,
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
         new_name: str,
     ) -> int:
         """
@@ -757,7 +757,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
         self,
         casevec: 'casevec_t *',
         targets: 'eavec_t *',
-        insn_ea: ida_idaapi.ea_t,
+        insn_ea: ea_t,
         si: 'switch_info_t',
     ) -> int:
         """
@@ -778,7 +778,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_create_switch_xrefs(
         self,
-        jumpea: ida_idaapi.ea_t,
+        jumpea: ea_t,
         si: 'switch_info_t',
     ) -> int:
         """
@@ -797,7 +797,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_is_align_insn(
         self,
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
     ) -> int:
         """
         Checks if the instruction is created only for alignment purposes.
@@ -814,7 +814,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_is_alloca_probe(
         self,
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
     ) -> int:
         """
         Checks if the function at 'ea' behaves as __alloca_probe.
@@ -831,7 +831,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_delay_slot_insn(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         bexec: bool,
         fexec: bool,
     ) -> 'PyObject *':
@@ -914,7 +914,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_adjust_refinfo(
         self,
         ri: 'refinfo_t',
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         n: int,
         fd: 'fixup_data_t const *',
     ) -> int:
@@ -1016,7 +1016,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_get_bg_color(
         self,
         color: 'bgcolor_t *',
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
     ) -> int:
         """
         Get item background color.
@@ -1055,7 +1055,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
         self,
         possible_return_code: 'int *',
         pfn: 'func_t *',
-        max_func_end_ea: 'ida_idaapi.ea_t',
+        max_func_end_ea: 'ea_t',
     ) -> int:
         """
         Called after find_func_bounds() finishes. The module may fine-tune the function bounds.
@@ -1176,8 +1176,8 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_add_cref(
         self,
-        _from: 'ida_idaapi.ea_t',
-        to: 'ida_idaapi.ea_t',
+        _from: 'ea_t',
+        to: 'ea_t',
         type: 'cref_t',
     ) -> int:
         """
@@ -1195,8 +1195,8 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_add_dref(
         self,
-        _from: 'ida_idaapi.ea_t',
-        to: 'ida_idaapi.ea_t',
+        _from: 'ea_t',
+        to: 'ea_t',
         type: 'dref_t',
     ) -> int:
         """
@@ -1214,8 +1214,8 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_del_cref(
         self,
-        _from: 'ida_idaapi.ea_t',
-        to: 'ida_idaapi.ea_t',
+        _from: 'ea_t',
+        to: 'ea_t',
         expand: bool,
     ) -> int:
         """
@@ -1233,8 +1233,8 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_del_dref(
         self,
-        _from: 'ida_idaapi.ea_t',
-        to: 'ida_idaapi.ea_t',
+        _from: 'ea_t',
+        to: 'ea_t',
     ) -> int:
         """
         A data reference is being deleted.
@@ -1250,8 +1250,8 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_coagulate_dref(
         self,
-        _from: 'ida_idaapi.ea_t',
-        to: 'ida_idaapi.ea_t',
+        _from: 'ea_t',
+        to: 'ea_t',
         may_define: bool,
         code_ea: 'ea_t *',
     ) -> int:
@@ -1274,7 +1274,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_may_show_sreg(
         self,
-        current_ea: 'ida_idaapi.ea_t',
+        current_ea: 'ea_t',
     ) -> int:
         """
         The kernel wants to display the segment registers in the messages window.
@@ -1306,7 +1306,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_validate_flirt_func(
         self,
-        start_ea: 'ida_idaapi.ea_t',
+        start_ea: 'ea_t',
         funcname: str,
     ) -> int:
         """
@@ -1346,9 +1346,9 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_assemble(
         self,
-        ea: 'ida_idaapi.ea_t',
-        cs: 'ida_idaapi.ea_t',
-        ip: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
+        cs: 'ea_t',
+        ip: 'ea_t',
         use32: bool,
         line: str,
     ) -> 'PyObject *':
@@ -1370,7 +1370,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_extract_address(
         self,
         out_ea: 'ea_t *',
-        screen_ea: 'ida_idaapi.ea_t',
+        screen_ea: 'ea_t',
         string: str,
         position: 'size_t',
     ) -> int:
@@ -1454,7 +1454,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_create_flat_group(
         self,
-        image_base: 'ida_idaapi.ea_t',
+        image_base: 'ea_t',
         bitness: int,
         dataseg_sel: 'sel_t',
     ) -> int:
@@ -1491,7 +1491,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_analyze_prolog(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
     ) -> int:
         """
         Analyzes function prolog/epilog and updates purge and function attributes.
@@ -1612,7 +1612,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_set_code16_mode(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         code16: bool,
     ) -> int:
         """
@@ -1629,7 +1629,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_get_code16_mode(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
     ) -> int:
         """
         Get ISA 16-bit mode.
@@ -1842,7 +1842,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_next_exec_insn(
         self,
         target: 'ea_t *',
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         tid: int,
         getreg: 'processor_t::regval_getter_t *',
         regvalues: 'regval_t',
@@ -1871,7 +1871,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_calc_step_over(
         self,
         target: 'ea_t *',
-        ip: 'ida_idaapi.ea_t',
+        ip: 'ea_t',
     ) -> int:
         """
         Calculate the address of the instruction which will be executed after "step over".
@@ -1914,7 +1914,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
     def ev_get_macro_insn_head(
         self,
         head: 'ea_t *',
-        ip: 'ida_idaapi.ea_t',
+        ip: 'ea_t',
     ) -> int:
         """
         Calculate the start of a macro instruction.
@@ -1970,7 +1970,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_clean_tbit(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         getreg: 'processor_t::regval_getter_t *',
         regvalues: 'regval_t',
     ) -> int:
@@ -2137,7 +2137,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_calc_cdecl_purged_bytes(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
     ) -> int:
         """
         Calculate number of purged bytes after call.
@@ -2296,7 +2296,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_use_stkarg_type(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         arg: 'funcarg_t',
     ) -> int:
         """
@@ -2313,7 +2313,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_use_regarg_type(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         rargs: 'funcargvec_t const *',
     ) -> 'PyObject *':
         """
@@ -2330,7 +2330,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_use_arg_types(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         fti: 'func_type_data_t',
         rargs: 'funcargvec_t *',
     ) -> int:
@@ -2349,7 +2349,7 @@ class ProcessorHooks(_BaseHooks, IDP_Hooks):
 
     def ev_arg_addrs_ready(
         self,
-        caller: 'ida_idaapi.ea_t',
+        caller: 'ea_t',
         n: int,
         tif: 'tinfo_t',
         addrs: 'ea_t *',
@@ -2484,7 +2484,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.auto_empty_finally(self)
 
-    def determined_main(self, main: 'ida_idaapi.ea_t') -> None:
+    def determined_main(self, main: 'ea_t') -> None:
         """
         The main() function has been determined.
 
@@ -2555,7 +2555,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.compiler_changed(self, adjust_inf_fields)
 
     def changing_ti(
-        self, ea: 'ida_idaapi.ea_t', new_type: 'type_t const *', new_fnames: 'p_list const *'
+        self, ea: 'ea_t', new_type: 'type_t const *', new_fnames: 'p_list const *'
     ) -> None:
         """
         An item typestring (c/c++ prototype) is to be changed.
@@ -2568,7 +2568,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.changing_ti(self, ea, new_type, new_fnames)
 
     def ti_changed(
-        self, ea: 'ida_idaapi.ea_t', type: 'type_t const *', fnames: 'p_list const *'
+        self, ea: 'ea_t', type: 'type_t const *', fnames: 'p_list const *'
     ) -> None:
         """
         An item typestring (c/c++ prototype) has been changed.
@@ -2582,7 +2582,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
 
     def changing_op_ti(
         self,
-        ea: 'ida_idaapi.ea_t',
+        ea: 'ea_t',
         n: int,
         new_type: 'type_t const *',
         new_fnames: 'p_list const *',
@@ -2599,7 +2599,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.changing_op_ti(self, ea, n, new_type, new_fnames)
 
     def op_ti_changed(
-        self, ea: 'ida_idaapi.ea_t', n: int, type: 'type_t const *', fnames: 'p_list const *'
+        self, ea: 'ea_t', n: int, type: 'type_t const *', fnames: 'p_list const *'
     ) -> None:
         """
         An operand typestring (c/c++ prototype) has been changed.
@@ -2612,7 +2612,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.op_ti_changed(self, ea, n, type, fnames)
 
-    def changing_op_type(self, ea: 'ida_idaapi.ea_t', n: int, opinfo: 'opinfo_t') -> None:
+    def changing_op_type(self, ea: 'ea_t', n: int, opinfo: 'opinfo_t') -> None:
         """
         An operand type (offset, hex, etc...) is to be changed.
 
@@ -2623,7 +2623,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.changing_op_type(self, ea, n, opinfo)
 
-    def op_type_changed(self, ea: 'ida_idaapi.ea_t', n: int) -> None:
+    def op_type_changed(self, ea: 'ea_t', n: int) -> None:
         """
         An operand type (offset, hex, etc...) has been set or deleted.
 
@@ -2642,7 +2642,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.segm_added(self, s)
 
-    def deleting_segm(self, start_ea: 'ida_idaapi.ea_t') -> None:
+    def deleting_segm(self, start_ea: 'ea_t') -> None:
         """
         A segment is to be deleted.
 
@@ -2652,7 +2652,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.deleting_segm(self, start_ea)
 
     def segm_deleted(
-        self, start_ea: 'ida_idaapi.ea_t', end_ea: 'ida_idaapi.ea_t', flags: int
+        self, start_ea: 'ea_t', end_ea: 'ea_t', flags: int
     ) -> None:
         """
         A segment has been deleted.
@@ -2665,7 +2665,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.segm_deleted(self, start_ea, end_ea, flags)
 
     def changing_segm_start(
-        self, s: 'segment_t *', new_start: 'ida_idaapi.ea_t', segmod_flags: int
+        self, s: 'segment_t *', new_start: 'ea_t', segmod_flags: int
     ) -> None:
         """
         Segment start address is to be changed.
@@ -2677,7 +2677,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.changing_segm_start(self, s, new_start, segmod_flags)
 
-    def segm_start_changed(self, s: 'segment_t *', oldstart: 'ida_idaapi.ea_t') -> None:
+    def segm_start_changed(self, s: 'segment_t *', oldstart: 'ea_t') -> None:
         """
         Segment start address has been changed.
 
@@ -2688,7 +2688,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.segm_start_changed(self, s, oldstart)
 
     def changing_segm_end(
-        self, s: 'segment_t *', new_end: 'ida_idaapi.ea_t', segmod_flags: int
+        self, s: 'segment_t *', new_end: 'ea_t', segmod_flags: int
     ) -> None:
         """
         Segment end address is to be changed.
@@ -2700,7 +2700,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.changing_segm_end(self, s, new_end, segmod_flags)
 
-    def segm_end_changed(self, s: 'segment_t *', oldend: 'ida_idaapi.ea_t') -> None:
+    def segm_end_changed(self, s: 'segment_t *', oldend: 'ea_t') -> None:
         """
         Segment end address has been changed.
 
@@ -2760,8 +2760,8 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
 
     def segm_moved(
         self,
-        _from: 'ida_idaapi.ea_t',
-        to: 'ida_idaapi.ea_t',
+        _from: 'ea_t',
+        to: 'ea_t',
         size: 'asize_t',
         changed_netmap: bool,
     ) -> None:
@@ -2803,7 +2803,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.func_updated(self, pfn)
 
-    def set_func_start(self, pfn: 'func_t *', new_start: 'ida_idaapi.ea_t') -> None:
+    def set_func_start(self, pfn: 'func_t *', new_start: 'ea_t') -> None:
         """
         Function chunk start address will be changed.
 
@@ -2813,7 +2813,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.set_func_start(self, pfn, new_start)
 
-    def set_func_end(self, pfn: 'func_t *', new_end: 'ida_idaapi.ea_t') -> None:
+    def set_func_end(self, pfn: 'func_t *', new_end: 'ea_t') -> None:
         """
         Function chunk end address will be changed.
 
@@ -2870,7 +2870,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.deleting_func_tail(self, pfn, tail)
 
-    def func_tail_deleted(self, pfn: 'func_t *', tail_ea: 'ida_idaapi.ea_t') -> None:
+    def func_tail_deleted(self, pfn: 'func_t *', tail_ea: 'ea_t') -> None:
         """
         A function tail chunk has been removed.
 
@@ -2881,7 +2881,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.func_tail_deleted(self, pfn, tail_ea)
 
     def tail_owner_changed(
-        self, tail: 'func_t *', owner_func: 'ida_idaapi.ea_t', old_owner: 'ida_idaapi.ea_t'
+        self, tail: 'func_t *', owner_func: 'ea_t', old_owner: 'ea_t'
     ) -> None:
         """
         A tail chunk owner has been changed.
@@ -2940,8 +2940,8 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
 
     def sgr_changed(
         self,
-        start_ea: 'ida_idaapi.ea_t',
-        end_ea: 'ida_idaapi.ea_t',
+        start_ea: 'ea_t',
+        end_ea: 'ea_t',
         regnum: int,
         value: 'sel_t',
         old_value: 'sel_t',
@@ -2970,7 +2970,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.make_code(self, insn)
 
     def make_data(
-        self, ea: 'ida_idaapi.ea_t', flags: 'flags64_t', tid: 'tid_t', len: 'asize_t'
+        self, ea: 'ea_t', flags: 'flags64_t', tid: 'tid_t', len: 'asize_t'
     ) -> None:
         """
         A data item is being created.
@@ -2984,7 +2984,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.make_data(self, ea, flags, tid, len)
 
     def destroyed_items(
-        self, ea1: 'ida_idaapi.ea_t', ea2: 'ida_idaapi.ea_t', will_disable_range: bool
+        self, ea1: 'ea_t', ea2: 'ea_t', will_disable_range: bool
     ) -> None:
         """
         Instructions/data have been destroyed in [ea1, ea2).
@@ -2997,7 +2997,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.destroyed_items(self, ea1, ea2, will_disable_range)
 
     def renamed(
-        self, ea: 'ida_idaapi.ea_t', new_name: str, local_name: bool, old_name: str
+        self, ea: 'ea_t', new_name: str, local_name: bool, old_name: str
     ) -> None:
         """
         The kernel has renamed a byte. See also the rename event.
@@ -3010,7 +3010,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.renamed(self, ea, new_name, local_name, old_name)
 
-    def byte_patched(self, ea: 'ida_idaapi.ea_t', old_value: int) -> None:
+    def byte_patched(self, ea: 'ea_t', old_value: int) -> None:
         """
         A byte has been patched.
 
@@ -3020,7 +3020,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.byte_patched(self, ea, old_value)
 
-    def changing_cmt(self, ea: 'ida_idaapi.ea_t', repeatable_cmt: bool, newcmt: str) -> None:
+    def changing_cmt(self, ea: 'ea_t', repeatable_cmt: bool, newcmt: str) -> None:
         """
         An item comment is to be changed.
 
@@ -3031,7 +3031,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.changing_cmt(self, ea, repeatable_cmt, newcmt)
 
-    def cmt_changed(self, ea: 'ida_idaapi.ea_t', repeatable_cmt: bool) -> None:
+    def cmt_changed(self, ea: 'ea_t', repeatable_cmt: bool) -> None:
         """
         An item comment has been changed.
 
@@ -3069,7 +3069,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.range_cmt_changed(self, kind, a, cmt, repeatable)
 
-    def extra_cmt_changed(self, ea: 'ida_idaapi.ea_t', line_idx: int, cmt: str) -> None:
+    def extra_cmt_changed(self, ea: 'ea_t', line_idx: int, cmt: str) -> None:
         """
         An extra comment has been changed.
 
@@ -3080,7 +3080,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.extra_cmt_changed(self, ea, line_idx, cmt)
 
-    def item_color_changed(self, ea: 'ida_idaapi.ea_t', color: 'bgcolor_t') -> None:
+    def item_color_changed(self, ea: 'ea_t', color: 'bgcolor_t') -> None:
         """
         An item color has been changed.
 
@@ -3090,7 +3090,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.item_color_changed(self, ea, color)
 
-    def callee_addr_changed(self, ea: 'ida_idaapi.ea_t', callee: 'ida_idaapi.ea_t') -> None:
+    def callee_addr_changed(self, ea: 'ea_t', callee: 'ea_t') -> None:
         """
         Callee address has been updated by the user.
 
@@ -3116,7 +3116,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         return IDB_Hooks.bookmark_changed(self, index, pos, desc, operation)
 
     def sgr_deleted(
-        self, start_ea: 'ida_idaapi.ea_t', end_ea: 'ida_idaapi.ea_t', regnum: int
+        self, start_ea: 'ea_t', end_ea: 'ea_t', regnum: int
     ) -> None:
         """
         The kernel has deleted a segment register value.
@@ -3137,7 +3137,7 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.adding_segm(self, s)
 
-    def func_deleted(self, func_ea: 'ida_idaapi.ea_t') -> None:
+    def func_deleted(self, func_ea: 'ea_t') -> None:
         """
         A function has been deleted.
 
@@ -3249,45 +3249,45 @@ class DatabaseHooks(_BaseHooks, IDB_Hooks):
         """
         return IDB_Hooks.lt_udt_expanded(self, udtname, udm_tid, delta)
 
-    def frame_created(self, func_ea: ida_idaapi.ea_t) -> None:
+    def frame_created(self, func_ea: ea_t) -> None:
         """
         A function frame has been created.
         """
         return IDB_Hooks.frame_created(self, func_ea)
 
-    def frame_udm_created(self, func_ea: ida_idaapi.ea_t, udm: 'udm_t') -> None:
+    def frame_udm_created(self, func_ea: ea_t, udm: 'udm_t') -> None:
         """
         Frame member has been added.
         """
         return IDB_Hooks.frame_udm_created(self, func_ea, udm)
 
-    def frame_udm_deleted(self, func_ea: ida_idaapi.ea_t, udm_tid: 'tid_t', udm: 'udm_t') -> None:
+    def frame_udm_deleted(self, func_ea: ea_t, udm_tid: 'tid_t', udm: 'udm_t') -> None:
         """
         Frame member has been deleted.
         """
         return IDB_Hooks.frame_udm_deleted(self, func_ea, udm_tid, udm)
 
-    def frame_udm_renamed(self, func_ea: ida_idaapi.ea_t, udm: 'udm_t', oldname: str) -> None:
+    def frame_udm_renamed(self, func_ea: ea_t, udm: 'udm_t', oldname: str) -> None:
         """
         Frame member has been renamed.
         """
         return IDB_Hooks.frame_udm_renamed(self, func_ea, udm, oldname)
 
     def frame_udm_changed(
-        self, func_ea: ida_idaapi.ea_t, udm_tid: 'tid_t', udmold: 'udm_t', udmnew: 'udm_t'
+        self, func_ea: ea_t, udm_tid: 'tid_t', udmold: 'udm_t', udmnew: 'udm_t'
     ) -> None:
         """
         Frame member has been changed.
         """
         return IDB_Hooks.frame_udm_changed(self, func_ea, udm_tid, udmold, udmnew)
 
-    def frame_expanded(self, func_ea: ida_idaapi.ea_t, udm_tid: 'tid_t', delta: 'adiff_t') -> None:
+    def frame_expanded(self, func_ea: ea_t, udm_tid: 'tid_t', delta: 'adiff_t') -> None:
         """
         A frame type has been expanded or shrunk.
         """
         return IDB_Hooks.frame_expanded(self, func_ea, udm_tid, delta)
 
-    def idasgn_matched_ea(self, ea: ida_idaapi.ea_t, name: str, lib_name: str) -> None:
+    def idasgn_matched_ea(self, ea: ea_t, name: str, lib_name: str) -> None:
         """
         A FLIRT match has been found.
         """
@@ -3355,9 +3355,9 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         self,
         pid: 'pid_t',
         tid: 'thid_t',
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
         modinfo_name: str,
-        modinfo_base: ida_idaapi.ea_t,
+        modinfo_base: ea_t,
         modinfo_size: 'asize_t',
     ) -> None:
         """
@@ -3376,7 +3376,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         )
 
     def dbg_process_exit(
-        self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t, exit_code: int
+        self, pid: 'pid_t', tid: 'thid_t', ea: ea_t, exit_code: int
     ) -> None:
         """
         Called on process exit.
@@ -3393,9 +3393,9 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         self,
         pid: 'pid_t',
         tid: 'thid_t',
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
         modinfo_name: str,
-        modinfo_base: ida_idaapi.ea_t,
+        modinfo_base: ea_t,
         modinfo_size: 'asize_t',
     ) -> None:
         """
@@ -3412,7 +3412,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
             self, pid, tid, ea, modinfo_name, modinfo_base, modinfo_size
         )
 
-    def dbg_process_detach(self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t) -> None:
+    def dbg_process_detach(self, pid: 'pid_t', tid: 'thid_t', ea: ea_t) -> None:
         """
         Called on process detach.
 
@@ -3423,7 +3423,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         """
         return DBG_Hooks.dbg_process_detach(self, pid, tid, ea)
 
-    def dbg_thread_start(self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t) -> None:
+    def dbg_thread_start(self, pid: 'pid_t', tid: 'thid_t', ea: ea_t) -> None:
         """
         Called on thread start.
 
@@ -3435,7 +3435,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         return DBG_Hooks.dbg_thread_start(self, pid, tid, ea)
 
     def dbg_thread_exit(
-        self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t, exit_code: int
+        self, pid: 'pid_t', tid: 'thid_t', ea: ea_t, exit_code: int
     ) -> None:
         """
         Called on thread exit.
@@ -3452,9 +3452,9 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         self,
         pid: 'pid_t',
         tid: 'thid_t',
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
         modinfo_name: str,
-        modinfo_base: ida_idaapi.ea_t,
+        modinfo_base: ea_t,
         modinfo_size: 'asize_t',
     ) -> None:
         """
@@ -3473,7 +3473,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         )
 
     def dbg_library_unload(
-        self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t, info: str
+        self, pid: 'pid_t', tid: 'thid_t', ea: ea_t, info: str
     ) -> None:
         """
         Called on library unload.
@@ -3486,7 +3486,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         """
         return DBG_Hooks.dbg_library_unload(self, pid, tid, ea, info)
 
-    def dbg_information(self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t, info: str) -> None:
+    def dbg_information(self, pid: 'pid_t', tid: 'thid_t', ea: ea_t, info: str) -> None:
         """
         Debug information.
 
@@ -3502,10 +3502,10 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         self,
         pid: 'pid_t',
         tid: 'thid_t',
-        ea: ida_idaapi.ea_t,
+        ea: ea_t,
         exc_code: int,
         exc_can_cont: bool,
-        exc_ea: ida_idaapi.ea_t,
+        exc_ea: ea_t,
         exc_info: str,
     ) -> int:
         """
@@ -3530,7 +3530,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         """
         return DBG_Hooks.dbg_suspend_process(self)
 
-    def dbg_bpt(self, tid: 'thid_t', bptea: ida_idaapi.ea_t) -> int:
+    def dbg_bpt(self, tid: 'thid_t', bptea: ea_t) -> int:
         """
         A user defined breakpoint was reached.
         Args:
@@ -3539,7 +3539,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         """
         return DBG_Hooks.dbg_bpt(self, tid, bptea)
 
-    def dbg_trace(self, tid: 'thid_t', ip: ida_idaapi.ea_t) -> int:
+    def dbg_trace(self, tid: 'thid_t', ip: ea_t) -> int:
         """
         A step occurred (one instruction was executed).
         This event notification is only generated if step tracing is enabled.
@@ -3572,7 +3572,7 @@ class DebuggerHooks(_BaseHooks, DBG_Hooks):
         """
         return DBG_Hooks.dbg_step_over(self)
 
-    def dbg_run_to(self, pid: 'pid_t', tid: 'thid_t', ea: ida_idaapi.ea_t) -> None:
+    def dbg_run_to(self, pid: 'pid_t', tid: 'thid_t', ea: ea_t) -> None:
         """
         Called on run to.
         """
@@ -3726,7 +3726,7 @@ class UIHooks(_BaseHooks, UI_Hooks):
         """
         return UI_Hooks.widget_invisible(self, widget)
 
-    def get_ea_hint(self, ea: ida_idaapi.ea_t) -> 'PyObject *':
+    def get_ea_hint(self, ea: ea_t) -> 'PyObject *':
         """
         Requests a simple hint for an address. Use this event to generate a custom hint.
         See also: more generic ui_get_item_hint.
@@ -3737,7 +3737,7 @@ class UIHooks(_BaseHooks, UI_Hooks):
         """
         return UI_Hooks.get_ea_hint(self, ea)
 
-    def get_item_hint(self, ea: ida_idaapi.ea_t, max_lines: int) -> 'PyObject *':
+    def get_item_hint(self, ea: ea_t, max_lines: int) -> 'PyObject *':
         """
         Requests a multiline hint for an item.
         See also: more generic ui_get_custom_viewer_hint.
@@ -3909,7 +3909,7 @@ class UIHooks(_BaseHooks, UI_Hooks):
         """
         return UI_Hooks.current_widget_changed(self, widget, prev_widget)
 
-    def screen_ea_changed(self, ea: ida_idaapi.ea_t, prev_ea: ida_idaapi.ea_t) -> None:
+    def screen_ea_changed(self, ea: ea_t, prev_ea: ea_t) -> None:
         """
         Called when the "current address" has changed.
 

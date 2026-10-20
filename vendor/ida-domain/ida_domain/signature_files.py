@@ -10,7 +10,7 @@ import ida_diskio
 import ida_funcs
 import ida_idp
 import ida_loader
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from .base import DatabaseEntity, check_db_open, decorate_all_methods

@@ -74,7 +74,8 @@ from ._compat_types import (
 )
 
 if TYPE_CHECKING:
-    from ida_idaapi import ea_t, object_t
+    from ida_idaapi import object_t
+    from ._compat_typing import ea_t
 
     from .database import Database
 

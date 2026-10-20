@@ -12,7 +12,8 @@ import ida_segment
 import ida_typeinf
 from ida_funcs import func_t
 from ida_ida import inf_get_max_ea, inf_get_min_ea
-from ida_idaapi import BADADDR, ea_t
+from ida_idaapi import BADADDR
+from ._compat_typing import ea_t
 from ida_segment import segment_t
 from ida_typeinf import tinfo_t
 from typing_extensions import TYPE_CHECKING, Iterator, Optional

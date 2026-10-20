@@ -4,7 +4,7 @@ import logging
 from enum import IntFlag
 
 import ida_name
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, Iterator, Optional, Tuple, Union
 
 from .base import DatabaseEntity, InvalidEAError, check_db_open, decorate_all_methods

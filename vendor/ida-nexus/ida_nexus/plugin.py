@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
@@ -38,7 +39,7 @@ class _ReadyToRunHook(ida_kernwin.UI_Hooks):
         try:
             self.component.start_server()
         except Exception as exc:  # noqa: BLE001 -- IDA startup may raise SWIG errors
-            self.component.log(f"failed to start: {exc}")
+            self.component.log(f"failed to start: {exc}\n{traceback.format_exc()}")
 
     def postprocess_action(self, *args: Any) -> None:
         # IDA has restored the runtime analyzer from the persistent IDB setting

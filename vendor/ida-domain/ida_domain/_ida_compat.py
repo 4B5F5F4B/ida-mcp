@@ -20,7 +20,7 @@ import ida_hexrays
 import ida_range
 import ida_segment
 from ida_funcs import func_t
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 
 # --- ida_funcs ---------------------------------------------------------------
 

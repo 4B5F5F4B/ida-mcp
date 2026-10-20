@@ -12,7 +12,8 @@ import ida_nalt
 import ida_range
 import ida_search
 import idc
-from ida_idaapi import BADADDR, ea_t
+from ida_idaapi import BADADDR
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, List, Optional
 
 from .base import (

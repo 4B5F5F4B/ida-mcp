@@ -10,7 +10,7 @@ import importlib.util
 import sys
 import types
 from pathlib import Path
-from typing import Any
+from typing import Any, get_type_hints
 
 import pytest
 
@@ -24,6 +24,80 @@ def load_helper(name):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def test_import_base_and_hooks_without_sdk_address_alias(monkeypatch):
+    # Import complete modules, including eagerly evaluated hook annotations.
+    # The SDK double intentionally has no ea_t attribute.
+    idaapi = types.ModuleType("ida_idaapi")
+    monkeypatch.setitem(sys.modules, "ida_idaapi", idaapi)
+    package = types.ModuleType("_ida80_annotation_test")
+    package.__path__ = [str(DOMAIN)]
+    monkeypatch.setitem(sys.modules, package.__name__, package)
+    for name, hooks in {
+        "ida_kernwin": ("UI_Hooks", "View_Hooks"),
+        "ida_idp": ("IDP_Hooks", "IDB_Hooks"),
+        "ida_dbg": ("DBG_Hooks",),
+        "ida_hexrays": ("Hexrays_Hooks",),
+    }.items():
+        sdk = types.ModuleType(name)
+        for hook in hooks:
+            vars(sdk)[hook] = type(hook, (), {})
+        if name == "ida_kernwin":
+            vars(sdk)["get_kernel_version"] = lambda: "8.0"
+        monkeypatch.setitem(sys.modules, name, sdk)
+
+    loaded = {}
+    for name in ("_compat_typing", "base", "hooks"):
+        spec = importlib.util.spec_from_file_location(
+            package.__name__ + "." + name, DOMAIN / (name + ".py")
+        )
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        monkeypatch.setitem(sys.modules, spec.name, module)
+        spec.loader.exec_module(module)
+        loaded[name] = module
+
+    assert loaded["_compat_typing"].ea_t is int
+    assert get_type_hints(loaded["base"].InvalidEAError.__init__)["ea"] is int
+    assert get_type_hints(loaded["hooks"].DatabaseHooks.byte_patched)["ea"] is int
+    # No monkeypatch of the real SDK is needed by the compatibility code.
+    assert not hasattr(idaapi, "ea_t")
+
+
+def test_plugin_start_failure_includes_traceback():
+    import traceback
+
+    path = ROOT / "vendor/ida-nexus/ida_nexus/plugin.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    hook = next(
+        n
+        for n in tree.body
+        if isinstance(n, ast.ClassDef) and n.name == "_ReadyToRunHook"
+    )
+    method = next(
+        n
+        for n in hook.body
+        if isinstance(n, ast.FunctionDef) and n.name == "ready_to_run"
+    )
+    namespace: dict[str, Any] = {"traceback": traceback}
+    exec(  # noqa: S102 - trusted repository source
+        compile(ast.Module(body=[method], type_ignores=[]), str(path), "exec"),
+        namespace,
+    )
+    messages = []
+
+    def fail_start():
+        raise ImportError("missing SDK alias")
+
+    owner = types.SimpleNamespace(
+        component=types.SimpleNamespace(start_server=fail_start, log=messages.append)
+    )
+    namespace["ready_to_run"](owner)
+    assert len(messages) == 1
+    assert "failed to start: missing SDK alias" in messages[0]
+    assert "Traceback (most recent call last)" in messages[0]
+    assert "fail_start" in messages[0]
 
 
 @pytest.mark.parametrize(

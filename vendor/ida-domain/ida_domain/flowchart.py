@@ -19,7 +19,7 @@ from .base import (
 
 if TYPE_CHECKING:
     from ida_funcs import func_t
-    from ida_idaapi import ea_t
+    from ._compat_typing import ea_t
 
     from .database import Database
 

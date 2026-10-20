@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import ida_nalt
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from typing_extensions import TYPE_CHECKING, Iterator, Optional
 
 if TYPE_CHECKING:

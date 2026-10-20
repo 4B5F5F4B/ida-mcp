@@ -6,7 +6,7 @@ from typing import Union
 
 import ida_segment
 import idautils
-from ida_idaapi import ea_t
+from ._compat_typing import ea_t
 from ida_segment import segment_t
 from typing_extensions import TYPE_CHECKING, Iterator, Optional
 

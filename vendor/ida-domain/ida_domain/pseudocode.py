@@ -45,7 +45,7 @@ if TYPE_CHECKING:
         number_format_t,
         var_ref_t,
     )
-    from ida_idaapi import ea_t
+    from ._compat_typing import ea_t
     from ida_typeinf import tinfo_t
 
     from .database import Database
