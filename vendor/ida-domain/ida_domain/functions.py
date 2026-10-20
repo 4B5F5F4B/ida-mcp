@@ -1,0 +1,981 @@
+from __future__ import annotations
+
+import logging
+import warnings
+from dataclasses import dataclass
+from enum import Flag, IntEnum
+
+import ida_bytes
+import ida_funcs
+import ida_lines
+import ida_name
+import ida_typeinf
+from ida_funcs import func_t
+from ida_idaapi import BADADDR, ea_t
+from ida_ua import insn_t
+from typing_extensions import TYPE_CHECKING, Any, Iterator, List, Optional
+
+import ida_domain
+import ida_domain.flowchart
+
+from . import _ida_compat
+from .base import (
+    DatabaseEntity,
+    DecompilerError,
+    IdaDomainError,
+    InvalidEAError,
+    InvalidParameterError,
+    check_db_open,
+    decorate_all_methods,
+)
+from .flowchart import FlowChart, FlowChartFlags
+from .pseudocode import (
+    LocalVariable,
+    LocalVariableAccessType,
+    LocalVariableContext,
+    LocalVariableReference,
+    PseudocodeFunction,
+)
+from .types import TypeApplyFlags
+
+if TYPE_CHECKING:
+    from .database import Database
+    from .microcode import MicroBlockArray
+
+logger = logging.getLogger(__name__)
+
+
+class FunctionFlags(Flag):
+    """Function attribute flags from IDA SDK."""
+
+    if hasattr(ida_funcs, 'FUNC_NORET'):
+        NORET = ida_funcs.FUNC_NORET
+    """Function doesn't return"""
+    if hasattr(ida_funcs, 'FUNC_FAR'):
+        FAR = ida_funcs.FUNC_FAR
+    """Far function"""
+    if hasattr(ida_funcs, 'FUNC_LIB'):
+        LIB = ida_funcs.FUNC_LIB
+    """Library function"""
+    if hasattr(ida_funcs, 'FUNC_STATICDEF'):
+        STATICDEF = ida_funcs.FUNC_STATICDEF
+    """Static function"""
+    if hasattr(ida_funcs, 'FUNC_FRAME'):
+        FRAME = ida_funcs.FUNC_FRAME
+    """Function uses frame pointer (BP)"""
+    if hasattr(ida_funcs, 'FUNC_USERFAR'):
+        USERFAR = ida_funcs.FUNC_USERFAR
+    """User has specified far-ness of the function"""
+    if hasattr(ida_funcs, 'FUNC_HIDDEN'):
+        HIDDEN = ida_funcs.FUNC_HIDDEN
+    """A hidden function chunk"""
+    if hasattr(ida_funcs, 'FUNC_THUNK'):
+        THUNK = ida_funcs.FUNC_THUNK
+    """Thunk (jump) function"""
+    if hasattr(ida_funcs, 'FUNC_BOTTOMBP'):
+        BOTTOMBP = ida_funcs.FUNC_BOTTOMBP
+    """BP points to the bottom of the stack frame"""
+    if hasattr(ida_funcs, 'FUNC_NORET_PENDING'):
+        NORET_PENDING = ida_funcs.FUNC_NORET_PENDING
+    """Function 'non-return' analysis needed"""
+    if hasattr(ida_funcs, 'FUNC_SP_READY'):
+        SP_READY = ida_funcs.FUNC_SP_READY
+    """SP-analysis has been performed"""
+    if hasattr(ida_funcs, 'FUNC_FUZZY_SP'):
+        FUZZY_SP = ida_funcs.FUNC_FUZZY_SP
+    """Function changes SP in untraceable way"""
+    if hasattr(ida_funcs, 'FUNC_PROLOG_OK'):
+        PROLOG_OK = ida_funcs.FUNC_PROLOG_OK
+    """Prolog analysis has been performed"""
+    if hasattr(ida_funcs, 'FUNC_PURGED_OK'):
+        PURGED_OK = ida_funcs.FUNC_PURGED_OK
+    """'argsize' field has been validated"""
+    if hasattr(ida_funcs, 'FUNC_TAIL'):
+        TAIL = ida_funcs.FUNC_TAIL
+    """This is a function tail"""
+    if hasattr(ida_funcs, 'FUNC_LUMINA'):
+        LUMINA = ida_funcs.FUNC_LUMINA
+    """Function info is provided by Lumina"""
+    if hasattr(ida_funcs, 'FUNC_OUTLINE'):
+        OUTLINE = ida_funcs.FUNC_OUTLINE
+    """Outlined code, not a real function"""
+    if hasattr(ida_funcs, 'FUNC_REANALYZE'):
+        REANALYZE = ida_funcs.FUNC_REANALYZE
+    """Function frame changed, request to reanalyze"""
+    if hasattr(ida_funcs, 'FUNC_UNWIND'):
+        UNWIND = ida_funcs.FUNC_UNWIND
+    """Function is an exception unwind handler"""
+    if hasattr(ida_funcs, 'FUNC_CATCH'):
+        CATCH = ida_funcs.FUNC_CATCH
+    """Function is an exception catch handler"""
+
+
+class MoveFunctionResult(IntEnum):
+    """Result codes for moving a function chunk's start address (``MOVE_FUNC_*``)."""
+
+    if hasattr(ida_funcs, 'MOVE_FUNC_OK'):
+        OK = ida_funcs.MOVE_FUNC_OK
+    """Successfully moved the function"""
+    if hasattr(ida_funcs, 'MOVE_FUNC_NOCODE'):
+        NOCODE = ida_funcs.MOVE_FUNC_NOCODE
+    """No instruction at the new start address"""
+    if hasattr(ida_funcs, 'MOVE_FUNC_BADSTART'):
+        BADSTART = ida_funcs.MOVE_FUNC_BADSTART
+    """Bad new start address"""
+    if hasattr(ida_funcs, 'MOVE_FUNC_NOFUNC'):
+        NOFUNC = ida_funcs.MOVE_FUNC_NOFUNC
+    """No function at the given address"""
+    if hasattr(ida_funcs, 'MOVE_FUNC_REFUSED'):
+        REFUSED = ida_funcs.MOVE_FUNC_REFUSED
+    """A plugin refused the operation"""
+
+
+class FunctionMoveError(IdaDomainError):
+    """Raised when a function's start address could not be moved.
+
+    Attributes:
+        code: The :class:`MoveFunctionResult` code (``None`` if not available).
+        errea: The address where the error occurred (``None`` if not available).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        code: Optional[MoveFunctionResult] = None,
+        errea: Optional[ea_t] = None,
+    ):
+        self.code = code
+        self.errea = errea
+        super().__init__(message)
+
+
+@dataclass
+class StackPoint:
+    """Stack pointer change information."""
+
+    ea: ea_t
+    """Address where SP changes"""
+    sp_delta: int
+    """Stack pointer delta at this point"""
+
+
+@dataclass
+class TailInfo:
+    """Function tail chunk information."""
+
+    owner_ea: ea_t
+    """Address of owning function"""
+    owner_name: str
+    """Name of owning function"""
+
+
+@dataclass
+class FunctionChunk:
+    """Represents a function chunk (main or tail)."""
+
+    start_ea: ea_t
+    """Start address of the function chunk"""
+    end_ea: ea_t
+    """End address of the function chunk"""
+    is_main: bool
+    """True if is the function main chunk"""
+
+
+@decorate_all_methods(check_db_open)
+class Functions(DatabaseEntity):
+    """
+    Provides access to function-related operations within the IDA database.
+
+    This class handles function discovery, analysis, manipulation, and provides
+    access to function properties like names, signatures, basic blocks, and pseudocode.
+
+    Can be used to iterate over all functions in the opened database.
+
+    Args:
+        database: Reference to the active IDA database.
+
+    Note:
+        Since this class does not manage the lifetime of IDA kernel objects (func_t*),
+        it is recommended to use these pointers within a limited scope. Obtain the pointer,
+        perform the necessary operations, and avoid retaining references beyond the
+        immediate context to prevent potential issues with object invalidation.
+    """
+
+    def __init__(self, database: Database):
+        super().__init__(database)
+
+    def __iter__(self) -> Iterator[func_t]:
+        return self.get_all()
+
+    def __len__(self) -> int:
+        """Return the total number of functions in the database.
+
+        Returns:
+            int: The number of functions in the program.
+        """
+        return ida_funcs.get_func_qty()
+
+    def get_between(self, start_ea: ea_t, end_ea: ea_t) -> Iterator[func_t]:
+        """
+        Retrieves functions within the specified address range.
+
+        Args:
+            start_ea: Start address of the range (inclusive).
+            end_ea: End address of the range (exclusive).
+
+        Yields:
+            Function objects whose start address falls within the specified range.
+
+        Raises:
+            InvalidEAError: If the start_ea/end_ea are specified but they are not
+                in the database range.
+        """
+        if not self.database.is_valid_ea(start_ea, strict_check=False):
+            raise InvalidEAError(start_ea)
+        if not self.database.is_valid_ea(end_ea, strict_check=False):
+            raise InvalidEAError(end_ea)
+        if start_ea >= end_ea:
+            raise InvalidParameterError('start_ea', start_ea, 'must be less than end_ea')
+
+        for i in range(ida_funcs.get_func_qty()):
+            func = ida_funcs.getn_func(i)
+            if func is None:
+                continue
+
+            if func.start_ea >= end_ea:
+                # Functions are typically ordered by address, so we can break early
+                break
+
+            if start_ea <= func.start_ea < end_ea:
+                yield func
+
+    def get_all(self) -> Iterator[func_t]:
+        """
+        Retrieves all functions in the database.
+
+        Returns:
+            An iterator over all functions in the database.
+        """
+        return self.get_between(self.database.minimum_ea, self.database.maximum_ea)
+
+    def get_at(self, ea: ea_t) -> Optional[func_t]:
+        """
+        Retrieves the function that contains the given address.
+
+        Args:
+            ea: An effective address within the function body.
+
+        Returns:
+            The function object containing the address,
+            or None if no function exists at that address.
+
+        Raises:
+            InvalidEAError: If the effective address is invalid.
+        """
+        if not self.database.is_valid_ea(ea):
+            raise InvalidEAError(ea)
+        return ida_funcs.get_func(ea)
+
+    def set_name(self, func: func_t, name: str, auto_correct: bool = True) -> bool:
+        """
+        Renames the given function.
+
+        Args:
+            func: The function instance.
+            name: The new name to assign to the function.
+            auto_correct: If True, allows IDA to replace invalid characters automatically.
+
+        Returns:
+            True if the function was successfully renamed, False otherwise.
+
+        Raises:
+            InvalidParameterError: If the name parameter is empty or invalid.
+        """
+        if not name.strip():
+            raise InvalidParameterError('name', name, 'The name parameter cannot be empty')
+
+        flags = ida_name.SN_NOCHECK if auto_correct else ida_name.SN_CHECK
+        return ida_name.set_name(func.start_ea, name, flags)
+
+    def get_flowchart(
+        self, func: func_t, flags: FlowChartFlags = FlowChartFlags.NONE
+    ) -> Optional[FlowChart]:
+        """
+        Retrieves the flowchart of the specified function,
+        which the user can use to retrieve basic blocks.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            An iterator over the function's basic blocks, or empty iterator if function is invalid.
+        """
+        return ida_domain.flowchart.FlowChart(self.database, func, None, flags)
+
+    def get_instructions(self, func: func_t) -> Iterator[insn_t]:
+        """
+        Retrieves all instructions within the given function.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            An iterator over all instructions in the function,
+            or empty iterator if function is invalid.
+        """
+        return self.database.instructions.get_between(func.start_ea, func.end_ea)
+
+    def get_disassembly(self, func: func_t, remove_tags: bool = True) -> List[str]:
+        """
+        Retrieves the disassembly lines for the given function.
+
+        Args:
+            func: The function instance.
+            remove_tags: If True, removes IDA color/formatting tags from the output.
+
+        Returns:
+            A list of strings, each representing a line of disassembly.
+            Returns empty list if function is invalid.
+        """
+        lines = []
+        ea = func.start_ea
+
+        options = ida_lines.GENDSM_MULTI_LINE
+        if remove_tags:
+            options |= ida_lines.GENDSM_REMOVE_TAGS
+
+        while ea != BADADDR and ea < func.end_ea:
+            line = ida_lines.generate_disasm_line(ea, options)
+            if line:
+                lines.append(line)
+
+            ea = ida_bytes.next_head(ea, func.end_ea)
+
+        return lines
+
+    def get_pseudocode(self, func: func_t) -> PseudocodeFunction:
+        """
+        Decompiles the given function and returns the pseudocode result.
+
+        Delegates to ``db.pseudocode.decompile()``.
+
+        The returned object provides full ctree access.  To get the
+        pseudocode as plain text, call ``str()`` or ``to_text()``:
+
+        ```python
+        pseudo = db.functions.get_pseudocode(func)
+        print(str(pseudo))           # full text
+        print(pseudo.to_text())      # list of lines
+        ```
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            A :class:`~ida_domain.pseudocode.PseudocodeFunction` wrapping the
+            decompiled result.
+
+        Raises:
+            PseudocodeError: If decompilation fails for the function.
+        """
+        return self.database.pseudocode.decompile(func)
+
+    def get_microcode(self, func: func_t) -> MicroBlockArray:
+        """
+        Generates microcode for the given function.
+
+        Delegates to ``db.microcode.generate()``.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            A :class:`~ida_domain.microcode.MicroBlockArray` representing the
+            generated microcode.
+
+        Raises:
+            MicrocodeError: If microcode generation fails for the function.
+        """
+        return self.database.microcode.generate(func)
+
+    def get_signature(self, func: func_t) -> Optional[str]:
+        """
+        Retrieves the function's type signature.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            The function signature as a string, or ``None`` if no type
+            is stored for this function.
+        """
+        return ida_typeinf.idc_get_type(func.start_ea)
+
+    def get_name(self, func: func_t) -> str:
+        """
+        Retrieves the function's name.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            The function name as a string, or empty string if no name is set.
+        """
+        name = self.database.names.get_at(func.start_ea)
+        return name if name is not None else ''
+
+    def create(self, ea: ea_t) -> bool:
+        """
+        Creates a new function at the specified address.
+
+        Args:
+            ea: The effective address where the function should start.
+
+        Returns:
+            True if the function was successfully created, False otherwise.
+
+        Raises:
+            InvalidEAError: If the effective address is invalid.
+        """
+        if not self.database.is_valid_ea(ea):
+            raise InvalidEAError(ea)
+        return ida_funcs.add_func(ea)
+
+    def remove(self, ea: ea_t) -> bool:
+        """
+        Removes the function at the specified address.
+
+        Args:
+            ea: The effective address of the function to remove.
+
+        Returns:
+            True if the function was successfully removed, False otherwise.
+
+        Raises:
+            InvalidEAError: If the effective address is invalid.
+        """
+        if not self.database.is_valid_ea(ea):
+            raise InvalidEAError(ea)
+        return ida_funcs.del_func(ea)
+
+    def get_next(self, ea: int) -> Optional[func_t]:
+        """
+        Get the next function after the given address.
+
+        Args:
+            ea: Address to search from
+
+        Returns:
+            Next function after ea, or None if no more functions
+
+        Raises:
+            InvalidEAError: If the effective address is invalid.
+        """
+        if not self.database.is_valid_ea(ea, strict_check=False):
+            raise InvalidEAError(ea)
+        return ida_funcs.get_next_func(ea)
+
+    def get_chunk_at(self, ea: int) -> Optional[func_t]:
+        """
+        Get function chunk at exact address.
+
+        Args:
+            ea: Address within function chunk
+
+        Returns:
+            Function chunk or None
+
+        Raises:
+            InvalidEAError: If the effective address is invalid.
+        """
+        if not self.database.is_valid_ea(ea):
+            raise InvalidEAError(ea)
+        return ida_funcs.get_fchunk(ea)
+
+    def is_entry_chunk(self, chunk: func_t) -> bool:
+        """
+        Check if chunk is entry chunk.
+
+        Args:
+            chunk: Function chunk to check
+
+        Returns:
+            True if this is an entry chunk, False otherwise
+        """
+        return _ida_compat.is_function_entry(chunk.start_ea)
+
+    def is_tail_chunk(self, chunk: func_t) -> bool:
+        """
+        Check if chunk is tail chunk.
+
+        Args:
+            chunk: Function chunk to check
+
+        Returns:
+            True if this is a tail chunk, False otherwise
+        """
+        return _ida_compat.is_function_tail(chunk.start_ea)
+
+    def get_flags(self, func: func_t) -> FunctionFlags:
+        """
+        Get function attribute flags.
+
+        Args:
+            func: Function object
+
+        Returns:
+            FunctionFlags enum with all active flags
+        """
+        return FunctionFlags(func.flags)
+
+    def is_far(self, func: func_t) -> bool:
+        """
+        Check if function is far.
+
+        Args:
+            func: Function object
+
+        Returns:
+            True if function is far, False otherwise
+        """
+        return func.is_far()
+
+    def does_return(self, func: func_t) -> bool:
+        """
+        Check if function returns.
+
+        Args:
+            func: Function object
+
+        Returns:
+            True if function returns, False if it's noreturn
+        """
+        return func.does_return()
+
+    def get_callers(self, func: func_t) -> List[func_t]:
+        """
+        Gets all functions that call this function.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            List of calling functions.
+        """
+        callers: List[func_t] = []
+        caller_addrs = set()  # Use set to avoid duplicates
+
+        # Get all call references to this function
+        for caller_ea in self.database.xrefs.calls_to_ea(func.start_ea):
+            # Get the function containing this call site
+            caller_func = self.get_at(caller_ea)
+            if caller_func and caller_func.start_ea not in caller_addrs:
+                caller_addrs.add(caller_func.start_ea)
+                callers.append(caller_func)
+
+        return callers
+
+    def get_callees(self, func: func_t) -> List[func_t]:
+        """
+        Gets all functions called by this function.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            List of called functions.
+        """
+        callees: list[func_t] = []
+        callee_addrs = set()  # Use set to avoid duplicates
+
+        # Iterate through all instructions in the function to find calls and jumps
+        for inst in self.database.instructions.get_between(func.start_ea, func.end_ea):
+            # Get call references from this instruction
+            for target_ea in self.database.xrefs.calls_from_ea(inst.ea):
+                # Get the target function
+                target_func = self.get_at(target_ea)
+                if target_func and target_func.start_ea not in callee_addrs:
+                    # Make sure we're not including the same function (recursive calls)
+                    if target_func.start_ea != func.start_ea:
+                        callee_addrs.add(target_func.start_ea)
+                        callees.append(target_func)
+
+            # Also get jump references for tail calls
+            for target_ea in self.database.xrefs.jumps_from_ea(inst.ea):
+                # Get the target function
+                target_func = self.get_at(target_ea)
+                if target_func and target_func.start_ea not in callee_addrs:
+                    # Make sure we're not including the same function (recursive calls)
+                    if target_func.start_ea != func.start_ea:
+                        callee_addrs.add(target_func.start_ea)
+                        callees.append(target_func)
+
+        return callees
+
+    def get_by_name(self, name: str) -> Optional[func_t]:
+        """
+        Find a function by its name.
+
+        Args:
+            name: Function name to search for
+
+        Returns:
+            Function object if found, None otherwise
+        """
+        func_ea = ida_name.get_name_ea(BADADDR, name)
+        if func_ea != BADADDR:
+            return ida_funcs.get_func(func_ea)
+        return None
+
+    def get_function_by_name(self, name: str) -> Optional[func_t]:
+        warnings.warn(
+            'get_function_by_name deprecated, use get_by_name instead', DeprecationWarning
+        )
+        return self.get_by_name(name)
+
+    def get_tails(self, func: func_t) -> List[func_t]:
+        """
+        Get all tail chunks of a function.
+
+        Args:
+            func: Function object (must be entry chunk)
+
+        Returns:
+            List of tail chunks, empty if not entry chunk
+        """
+        if not _ida_compat.is_function_entry(func.start_ea):
+            return []
+
+        tails = []
+        for i in range(func.tailqty):
+            tails.append(func.tails[i])
+        return tails
+
+    def get_stack_points(self, func: func_t) -> List[StackPoint]:
+        """
+        Get function stack points for SP tracking.
+
+        Args:
+            func: Function object
+
+        Returns:
+            List of StackPoint objects showing where SP changes
+        """
+        points = []
+        for i in range(func.pntqty):
+            pnt = func.points[i]
+            points.append(StackPoint(ea=pnt.ea, sp_delta=pnt.spd))
+        return points
+
+    def get_tail_info(self, chunk: func_t) -> Optional[TailInfo]:
+        """
+        Get information about tail chunk's owner function.
+
+        Args:
+            chunk: Function chunk (must be tail chunk)
+
+        Returns:
+            TailInfo with owner details, or None if not a tail chunk
+        """
+        if not _ida_compat.is_function_tail(chunk.start_ea):
+            return None
+
+        owner_name = ''
+        if chunk.owner != BADADDR:
+            owner_name = self.database.names.get_at(chunk.owner) or ''
+
+        return TailInfo(owner_ea=chunk.owner, owner_name=owner_name)
+
+    def get_data_items(self, func: func_t) -> Iterator[ea_t]:
+        """
+        Iterate over data items within the function.
+
+        This method finds all addresses within the function that are defined
+        as data (not code). Useful for finding embedded data, jump tables,
+        or other non-code items within function boundaries.
+
+        Args:
+            func: The function object
+
+        Yields:
+            Addresses of data items within the function
+
+        Example:
+            ```python
+            >>> func = db.functions.get_at(0x401000)
+            >>> for data_ea in db.functions.get_data_items(func):
+            ...     size = ida_bytes.get_item_size(data_ea)
+            ...     print(f"Data at 0x{data_ea:x}, size: {size}")
+            ```
+        """
+        ea = func.start_ea
+        while ea < func.end_ea and ea != BADADDR:
+            flags = ida_bytes.get_flags(ea)
+            if ida_bytes.is_data(flags):
+                yield ea
+            ea = ida_bytes.next_head(ea, func.end_ea)
+
+    def get_chunks(self, func: func_t) -> Iterator[FunctionChunk]:
+        """
+        Get all chunks (main and tail) of a function.
+
+        Args:
+            func: The function to analyze.
+
+        Yields:
+            FunctionChunk objects representing each chunk.
+        """
+        # Main chunk
+        yield FunctionChunk(start_ea=func.start_ea, end_ea=func.end_ea, is_main=True)
+
+        # Tail chunks
+        for tail_start, tail_end in _ida_compat.iter_func_tail_ranges(func):
+            if tail_start != func.start_ea:  # Skip main chunk
+                yield FunctionChunk(start_ea=tail_start, end_ea=tail_end, is_main=False)
+
+    def is_chunk_at(self, ea: ea_t) -> bool:
+        """
+        Check if the given address belongs to a function chunk.
+
+        Args:
+            ea: The address to check.
+
+        Returns:
+            True if the address is in a function chunk.
+        """
+        func = ida_funcs.get_func(ea)
+        chunk = ida_funcs.get_fchunk(ea)
+        return chunk is not None and (func != chunk)
+
+    def set_comment(self, func: func_t, comment: str, repeatable: bool = False) -> bool:
+        """
+        Set comment for function.
+
+        Args:
+            func: The function to set comment for.
+            comment: Comment text to set.
+            repeatable: If True, creates a repeatable comment (shows at all identical operands).
+                        If False, creates a non-repeatable comment (shows only at this function).
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        return _ida_compat.set_func_cmt_ea(func.start_ea, comment, repeatable)
+
+    def get_comment(self, func: func_t, repeatable: bool = False) -> str:
+        """
+        Get comment for function.
+
+        Args:
+            func: The function to get comment from.
+            repeatable: If True, retrieves repeatable comment (shows at all identical operands).
+                        If False, retrieves non-repeatable comment (shows only at this function).
+
+        Returns:
+            Comment text, or empty string if no comment exists.
+        """
+        return _ida_compat.get_func_cmt_ea(func.start_ea, repeatable) or ''
+
+    def get_local_variables(self, func: func_t) -> List[LocalVariable]:
+        """
+        Get all local variables for a function.
+
+        Delegates to ``db.pseudocode.decompile()`` and reads the cfunc's
+        lvar table.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            List of local variables including arguments and local vars.
+
+        Raises:
+            PseudocodeError: If decompilation fails for the function.
+        """
+        pcfunc = self.database.pseudocode.decompile(func)
+        raw_cfunc = pcfunc.raw_cfunc
+        return [LocalVariable._from_raw(raw_cfunc, i) for i in range(raw_cfunc.lvars.size())]
+
+    def get_local_variable_references(
+        self, func: func_t, lvar: LocalVariable
+    ) -> List[LocalVariableReference]:
+        """
+        Get all references to a specific local variable.
+
+        Convenience entry point that forwards to
+        :meth:`PseudocodeFunction.find_variable_references`. Each returned
+        :class:`LocalVariableReference` carries the wrapped ctree nodes
+        (``expr``, ``parent``, lazy ``assignment``, ``walk_ancestors``) so
+        callers can perform deeper analyses — taint tracking, type
+        inference, deobfuscation — without copying any visitor internals.
+
+        Args:
+            func: The function instance.
+            lvar: The local variable to find references for.
+
+        Returns:
+            List of references to the variable in pseudocode.
+
+        Raises:
+            PseudocodeError: If decompilation fails for the function.
+        """
+        return self.database.pseudocode.decompile(func).find_variable_references(
+            var_index=lvar.index,
+        )
+
+    def get_local_variable_by_name(self, func: func_t, name: str) -> Optional[LocalVariable]:
+        """
+        Find a local variable by name.
+
+        Args:
+            func: The function instance.
+            name: Variable name to search for.
+
+        Returns:
+            LocalVariable if found
+
+        Raises:
+            PseudocodeError: If decompilation fails for the function.
+            KeyError: If the variable is not found
+        """
+        lvars = self.get_local_variables(func)
+        for lvar in lvars:
+            if lvar.name == name:
+                return lvar
+        raise KeyError(f'Variable {name} could not be located')
+
+    def set_start(self, func: func_t, new_start: ea_t) -> bool:
+        """
+        Change the start address of a function.
+
+        The new start must begin an instruction and lie outside any other
+        function.
+
+        Args:
+            func: The function instance.
+            new_start: The new start address.
+
+        Returns:
+            True if the start address was successfully changed.
+
+        Raises:
+            InvalidEAError: If new_start is not a valid address.
+            FunctionMoveError: If the start could not be moved. The reason is
+                available as ``.code``.
+        """
+        if not self.database.is_valid_ea(new_start):
+            raise InvalidEAError(new_start)
+        result = ida_funcs.set_func_start(func.start_ea, new_start)
+
+        if result != ida_funcs.MOVE_FUNC_OK:
+            code = MoveFunctionResult(result)
+            raise FunctionMoveError(
+                f'could not move function start to {new_start:#x}: {code.name}',
+                code=code,
+                errea=new_start,
+            )
+
+        return True
+
+    def set_end(self, func: func_t, new_end: ea_t) -> bool:
+        """
+        Change the end address of a function.
+
+        Args:
+            func: The function instance.
+            new_end: The new end address.
+
+        Returns:
+            True if the end was successfully changed, False otherwise.
+
+        Raises:
+            InvalidEAError: If new_end is outside the database range.
+        """
+        if not self.database.is_valid_ea(new_end, strict_check=False):
+            raise InvalidEAError(new_end)
+        return ida_funcs.set_func_end(func.start_ea, new_end)
+
+    def update(self, func: func_t) -> bool:
+        """
+        Persist in-place changes made to a function object back to the database.
+
+        Use this after modifying attributes on a ``func_t``. Function boundaries
+        must not be changed this way; use :meth:`set_start` / :meth:`set_end`
+        instead.
+
+        Args:
+            func: The function instance to update.
+
+        Returns:
+            True if the function was successfully updated, False otherwise.
+        """
+        return ida_funcs.update_func(func)
+
+    def reanalyze(self, func: func_t) -> None:
+        """
+        Schedule re-analysis of a function.
+
+        Warning:
+            This only queues the function for analysis. In headless (idalib) mode
+            there is no analysis loop, so call ``ida_auto.auto_wait()`` afterward
+            for the re-analysis to actually run.
+
+        Args:
+            func: The function instance.
+        """
+        _ida_compat.reanalyze_function_ea(func.start_ea)
+
+    def is_outlined(self, func: func_t) -> bool:
+        """
+        Check whether a function is outlined code.
+
+        Args:
+            func: The function instance.
+
+        Returns:
+            True if the function carries the outlined flag, False otherwise.
+        """
+        return FunctionFlags.OUTLINE in self.get_flags(func)
+
+    def set_outlined(self, func: func_t, outlined: bool = True) -> bool:
+        """
+        Set or clear the outlined flag on a function.
+
+        Args:
+            func: The function instance.
+            outlined: True to mark the function as outlined, False to clear it.
+
+        Returns:
+            True if the flag was successfully updated, False otherwise.
+        """
+        flags = func.flags
+        if outlined:
+            flags |= ida_funcs.FUNC_OUTLINE
+        else:
+            flags &= ~ida_funcs.FUNC_OUTLINE
+        return _ida_compat.set_func_flags(func.start_ea, flags)
+
+    def apply_declaration(
+        self, func: func_t, decl: str, flags: TypeApplyFlags = TypeApplyFlags.DEFINITE
+    ) -> bool:
+        """
+        Parse and apply a C-style prototype to a function.
+
+        Note:
+            This sets the prototype only; it does not rename the function
+            (to rename use ``set_name``).
+
+        Args:
+            func: The function instance.
+            decl: C prototype string (e.g. ``"int __fastcall f(int x)"``). Any
+                function name in the declaration is ignored.
+            flags: Type apply flags. Defaults to ``DEFINITE``.
+
+        Returns:
+            True if the prototype was parsed and applied successfully, False otherwise.
+
+        Raises:
+            InvalidEAError: If the function start address is invalid.
+            InvalidParameterError: If the declaration cannot be parsed.
+        """
+        return self.database.types.apply_declaration_at(func.start_ea, decl, flags)

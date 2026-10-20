@@ -8,9 +8,16 @@ license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "packaging",
-    "ida-nexus>=0.13.4",
+    "ida-nexus==0.13.4+ida80.1",
+    "ida-domain[idalib]==0.5.1+ida80.1",
     "zeromcp>=1.10.3",
 ]
+
+# The upstream packages require newer IDA SDKs. Always use the reviewed
+# compatibility forks when installing this checkout with uv.
+[tool.uv.sources]
+ida-nexus = { path = "vendor/ida-nexus", editable = true }
+ida-domain = { path = "vendor/ida-domain", editable = true }
 
 [project.urls]
 Repository = "https://github.com/HexRaysSA/ida-mcp"

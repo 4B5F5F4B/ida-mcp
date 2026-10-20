@@ -1,0 +1,179 @@
+name: Run tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Code quality checks
+    env:
+      HAS_IDA_CREDS: ${{ secrets.HCLI_API_KEY != '' && secrets.IDA_LICENSE_ID != '' }}
+
+    outputs:
+      has_ida_creds: ${{ steps.check-creds.outputs.has_ida_creds }}
+
+    steps:
+      - name: Check IDA credentials availability
+        id: check-creds
+        run: echo "has_ida_creds=$HAS_IDA_CREDS" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Code linting
+        run: uvx ruff check
+
+      - name: Type checking
+        run: uv run mypy ida_domain
+
+      - name: Build and verify package
+        run: |
+          rm -rf dist
+          uv build
+          uv run python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          expected = {
+              path.relative_to('examples').as_posix()
+              for path in Path('examples').rglob('*')
+              if path.is_file()
+          }
+          wheel = next(Path('dist').glob('*.whl'))
+          with ZipFile(wheel) as archive:
+              prefix = 'ida_domain/_examples/'
+              packaged = {
+                  name.removeprefix(prefix)
+                  for name in archive.namelist()
+                  if name.startswith(prefix) and not name.endswith('/')
+              }
+
+          assert packaged == expected, (
+              f'Packaged examples differ: missing={expected - packaged}, '
+              f'unexpected={packaged - expected}'
+          )
+          PY
+
+      - name: Tests skipped notification
+        if: env.HAS_IDA_CREDS != 'true'
+        run: |
+          echo "::warning::IDA-specific tests were skipped (no credentials available)"
+          echo ""
+          echo "Skipped steps:"
+          echo "   - IDA installation"
+          echo "   - Running tests that require IDA"
+          echo "   - Coverage report generation"
+          echo ""
+          echo "If you have an IDA license, configure HCLI_API_KEY and IDA_LICENSE_ID repository secrets."
+          echo "Please refer to CONTRIBUTING.md for instructions."
+          echo "Thanks for contributing!"
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    if: needs.lint.outputs.has_ida_creds == 'true'
+
+    strategy:
+      matrix:
+        ida_version:
+          - version: "9.1"
+            installer_path: "release/9.1/ida-pro/ida-pro_91_x64linux.run"
+          - version: "9.2"
+            installer_path: "release/9.2/ida-pro/ida-pro_92_x64linux.run"
+          - version: "9.3"
+            installer_path: "release/9.3/ida-pro/ida-pro_93_x64linux.run"
+          - version: "9.4"
+            installer_path: "release/9.4/ida-pro/ida-pro_94_x64linux.run"
+      fail-fast: false
+
+    name: Running tests on IDA ${{ matrix.ida_version.version }}
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Install IDA ${{ matrix.ida_version.version }}
+        uses: HexRaysSA/ida-hcli-actions/install-ida@v1
+        with:
+          installer-id: ${{ matrix.ida_version.installer_path }}
+          license-id: ${{ secrets.IDA_LICENSE_ID }}
+          api-key: ${{ secrets.HCLI_API_KEY }}
+          python-version: "3.13"
+          clean: "false"
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Install idapro
+        run: uv pip install idapro
+
+      - name: Run tests and generate coverage
+        id: tests
+        run: uv run coverage run --source=ida_domain -m pytest -v --junitxml=test-results.xml
+        env:
+          IDALOG: ida.log
+
+      - name: Flag deprecation warnings
+        if: ${{ always() && steps.tests.outputs.deprecation_warning_count }}
+        uses: actions/github-script@v8
+        env:
+          COUNT: ${{ steps.tests.outputs.deprecation_warning_count }}
+          CHECK_NAME: "⚠️ Deprecation warnings (IDA ${{ matrix.ida_version.version }})"
+        with:
+          script: |
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: process.env.CHECK_NAME,
+              head_sha: context.payload.pull_request?.head?.sha ?? context.sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: `${process.env.COUNT} unique deprecation warning(s)`,
+                summary: `The test run emitted ${process.env.COUNT} unique deprecation warning(s). ` +
+                  'See the annotations of the "Run tests and generate coverage" step for details.',
+              },
+            });
+
+      - name: Generate coverage reports
+        run: |
+          # Generate different coverage report formats
+          # NOTE: coverage are broken in CI due to a bug in IDA 9.1
+          # IDA-5480 is fixed in development, the fix will be part of in 9.2
+          uv run coverage report --include="ida_domain/*"
+          uv run coverage xml --include="ida_domain/*"
+          uv run coverage html --include="ida_domain/*"
+
+      - name: Upload test results and coverage
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: test-results-and-coverage-ida-${{ matrix.ida_version.version }}
+          path: |
+            test-results.xml
+            coverage.xml
+            htmlcov/
+            ida.log
+          retention-days: 30

@@ -1,6 +1,14 @@
 """IDA MCP GUI plugin entry point."""
 
+import sys
+from pathlib import Path
 from typing import Any
+
+# IDA 8 discovers flat plugin entry points and does not manage Python package
+# dependencies. The source installer places pure-Python dependencies beside it.
+_dependencies = Path(__file__).resolve().parent / "ida_mcp_deps"
+if _dependencies.is_dir():
+    sys.path.insert(0, str(_dependencies))
 
 import ida_nexus.plugin
 import idaapi

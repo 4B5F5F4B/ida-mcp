@@ -892,6 +892,17 @@ def _declares_nexus_gui_provider(plugin_dir: Path, expected_name: str) -> bool:
 
 def _gui_plugin_installed() -> bool:
     plugins_dir = _get_idausr_dir() / "plugins"
+    if (plugins_dir / "ida_mcp_plugin.py").is_file():
+        try:
+            legacy = json.loads(
+                (plugins_dir / "ida_mcp_deps" / "ida-mcp-install.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            if Version(legacy["ida-nexus"]) >= Version(NEXUS_PACKAGE_VERSION):
+                return True
+        except (OSError, ValueError, TypeError, KeyError):
+            pass
     if _compatible_gui_plugin(plugins_dir / "ida-nexus", NEXUS_PACKAGE_VERSION):
         return True
     return any(

@@ -1,0 +1,80 @@
+name: Run nightly tests
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Running tests on IDA nightly
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Install IDA nightly
+        uses: HexRaysSA/ida-hcli-actions/install-ida@v1
+        with:
+          installer-id: nightly@ida-pro:latest
+          license-id: ${{ secrets.IDA_LICENSE_ID }}
+          api-key: ${{ secrets.HCLI_API_KEY }}
+          python-version: "3.13"
+          clean: "false"
+
+      - name: Sync dependencies
+        run: uv sync --extra dev
+
+      - name: Install idapro
+        run: uv pip install idapro
+
+      - name: Run tests and generate coverage
+        id: tests
+        run: uv run coverage run --source=ida_domain -m pytest -v --junitxml=test-results.xml
+        env:
+          IDALOG: ida.log
+
+      - name: Flag deprecation warnings
+        if: ${{ always() && steps.tests.outputs.deprecation_warning_count }}
+        uses: actions/github-script@v8
+        env:
+          COUNT: ${{ steps.tests.outputs.deprecation_warning_count }}
+          CHECK_NAME: "⚠️ Deprecation warnings (IDA nightly)"
+        with:
+          script: |
+            await github.rest.checks.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: process.env.CHECK_NAME,
+              head_sha: context.sha,
+              status: 'completed',
+              conclusion: 'neutral',
+              output: {
+                title: `${process.env.COUNT} unique deprecation warning(s)`,
+                summary: `The test run emitted ${process.env.COUNT} unique deprecation warning(s). ` +
+                  'See the annotations of the "Run tests and generate coverage" step for details.',
+              },
+            });
+
+      - name: Generate coverage reports
+        run: |
+          uv run coverage report --include="ida_domain/*"
+          uv run coverage xml --include="ida_domain/*"
+          uv run coverage html --include="ida_domain/*"
+
+      - name: Upload test results and coverage
+        uses: actions/upload-artifact@v7
+        if: ${{ always() }}
+        with:
+          name: nightly-test-results-and-coverage
+          path: |
+            test-results.xml
+            coverage.xml
+            htmlcov/
+            ida.log
+          retention-days: 30

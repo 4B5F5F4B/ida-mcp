@@ -6,7 +6,7 @@
     "categories": ["api-scripting-and-automation"],
     "keywords": ["python", "automation", "mcp", "ai"],
     "description": "Expose IDA GUI databases through IDA Nexus for the official IDA MCP server.",
-    "idaVersions": ">=9.4",
+    "idaVersions": ">=8.0",
     "version": "20261008.0.1",
     "license": "MIT",
     "authors": [
@@ -18,9 +18,9 @@
     "urls": {
       "repository": "https://github.com/HexRaysSA/ida-mcp"
     },
-    "requiresPython": ">=3.11",
+    "requiresPython": ">=3.10",
     "pythonDependencies": [
-      "ida-nexus>=0.13.4"
+      "ida-nexus==0.13.4+ida80.1"
     ]
   }
 }

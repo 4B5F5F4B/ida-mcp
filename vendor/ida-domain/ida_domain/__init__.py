@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+import logging
+from logging import NullHandler
+from pathlib import Path
+
+
+def examples_path() -> Path:
+    """Return the directory containing the IDA Domain examples.
+
+    Packaged installations use the examples included in the distribution. Source
+    and editable installations fall back to the repository's ``examples`` directory.
+
+    Raises:
+        FileNotFoundError: If the examples are unavailable.
+    """
+    packaged_examples = Path(__file__).resolve().parent / '_examples'
+    if packaged_examples.is_dir():
+        return packaged_examples
+
+    checkout_examples = Path(__file__).resolve().parents[1] / 'examples'
+    if checkout_examples.is_dir():
+        return checkout_examples
+
+    raise FileNotFoundError('The IDA Domain examples could not be located')
+
+
+def _load_dependencies() -> None:
+    """
+    Load required dependencies
+
+    This needs to work both inside and outside IDA. This module works on top of IDA Python.
+    When running inside IDA, IDA Python is already available. When running outside IDA, we need
+    to explicitly import idapro, which loads the IDA kernel libraries and IDA Python for us.
+    """
+
+    # Check if IDA Python is already loaded
+    try:
+        import ida_kernwin
+
+        from ._compat_runtime import is_ida_library
+
+        need_idapro = is_ida_library()
+    except ImportError:
+        need_idapro = True
+
+    if need_idapro:
+        import idapro
+
+
+__version__ = '0.5.1+ida80.1'
+
+# Make sure all dependencies are loaded
+_load_dependencies()
+
+
+# Keep the ida kernel version, eg: Version("9.2")
+import ida_kernwin
+from packaging.version import Version
+
+__ida_version__: Version = Version(ida_kernwin.get_kernel_version())
+
+if __ida_version__ < Version('8.0'):
+    raise ImportError('IDA Domain requires IDA 8.0 or later with IDAPython')
+
+# If we reach this point kernel libraries were successfully loaded
+from .database import Database as Database
+
+logging.getLogger(__name__).addHandler(NullHandler())

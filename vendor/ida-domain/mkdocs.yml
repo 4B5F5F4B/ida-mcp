@@ -1,0 +1,178 @@
+site_name: IDA Domain API
+site_description: IDA Domain API - Python interface for IDA Pro reverse engineering platform
+site_author: Hex-Rays SA
+site_url: https://ida-domain.docs.hex-rays.com
+
+repo_url: https://github.com/hexrayssa/ida-domain
+repo_name: hexrayssa/ida-domain
+
+docs_dir: docs
+site_dir: site
+
+copyright: Copyright &copy; 2025 Hex-Rays
+
+nav:
+  - Intro: index.md
+  - Getting Started: getting_started.md
+  - FAQ: faq.md
+  - Examples: examples.md
+  - Usage:
+      - Overview: usage.md
+      - llms.txt: llm.md
+  - API Reference:
+      - ref/database.md
+      - ref/flowchart.md
+      - ref/bytes.md
+      - ref/comments.md
+      - ref/entries.md
+      - ref/hooks.md
+      - ref/functions.md
+      - ref/heads.md
+      - ref/imports.md
+      - ref/instructions.md
+      - ref/microcode.md
+      - ref/pseudocode.md
+      - ref/names.md
+      - ref/operands.md
+      - ref/segments.md
+      - ref/signature_files.md
+      - ref/strings.md
+      - ref/types.md
+      - ref/xrefs.md
+
+theme:
+  name: material
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      scheme: default
+      primary: black
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  features:
+    # Allows copying code blocks
+    - content.code.copy
+    # Allows selecting code blocks
+    - content.code.select
+    # Shows the current path in the sidebar
+    - navigation.path
+    # Shows sections in the sidebar
+    - navigation.sections
+    # Shows sections expanded by default
+    - navigation.expand
+    # Enables annotations in code blocks
+    - content.code.annotate
+    # others
+    - content.tabs.link
+    - content.code.annotate
+    - content.code.copy
+    - announce.dismiss
+    - navigation.footer
+    - navigation.indexes  # <= if set, each "section" can have its own page, if index.md is used
+    - navigation.instant
+    - navigation.instant.prefetch
+    # - navigation.instant.preview
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections  # <=
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - toc.follow
+  logo: assets/logo.svg
+  favicon: assets/favicon.ico
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [ "ida_domain" ]
+          options:
+            extensions:
+              - docs/_extensions/requires_ida.py:RequiresIdaExtension
+              - docs/_extensions/experimental.py:ExperimentalExtension
+            docstring_style: google
+            # Shows links to other members in signatures
+            signature_crossrefs: true
+            # Orders members by source order, rather than alphabetical
+            members_order: alphabetical
+            # Puts the signature on a separate line from the member name
+            separate_signature: true
+            # Shows type annotations in signatures
+            show_signature_annotations: true
+            # Show inherited members
+            inherited_members: true
+            show_if_no_docstring: true
+            ### SPECIFIC
+            show_submodules: true
+            docstring_section_style: list
+            filters: [ "!^_", "!^logger$" ]
+            heading_level: 2
+            merge_init_into_class: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_source: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            summary: true
+  - llmstxt:
+      markdown_description: This is a pure python package built on top of IDA Python SDK.
+
+        It provides easy access to the main entities manipulated by IDA Pro.
+        All entities are accessible trough the db handle.
+
+      full_output: llms-full.txt
+      sections:
+        Installation:
+          - index.md
+        Usage:
+          - usage.md
+        Examples:
+          - getting_started.md
+          - examples.md
+        API Reference:
+          - ref/*.md
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.snippets:
+  - pymdownx.details
+  - attr_list
+  - mkdocs-click
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+extra_css:
+  - stylesheets/extra.css
+
+watch:
+  - "ida_domain/"

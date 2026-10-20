@@ -1,0 +1,33 @@
+{
+  "kernel": "9.5",
+  "python": "3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]",
+  "domain_source": "D:\\code\\ida-mcp\\vendor\\ida-domain\\ida_domain\\__init__.py",
+  "nexus_source": "D:\\code\\ida-mcp\\vendor\\ida-nexus\\ida_nexus\\__init__.py",
+  "functions": 103,
+  "first_function": "pre_c_init",
+  "segments": 8,
+  "strings": 138,
+  "xrefs_to_first_function": 3,
+  "named_types": 63,
+  "numbered_types": 63,
+  "decompiler": {
+    "available": true,
+    "lines": 43
+  },
+  "comment_write_and_restore": true,
+  "byte_search": {
+    "first_match": 5368713232,
+    "all_match_count": 1
+  },
+  "operand_paths_read": 2,
+  "function_type_arguments": 1,
+  "save": {
+    "path": "D:\\code\\ida-mcp\\.compat-research\\sample.exe.i64"
+  },
+  "close": {
+    "closed": true
+  },
+  "backend": "idalib",
+  "transport": "MCP stdio",
+  "success": true
+}
