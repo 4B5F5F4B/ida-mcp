@@ -105,10 +105,11 @@ report
 class MCPClient:
     """Minimal stdio client; exercise the public MCP wire protocol."""
 
-    def __init__(self):
+    def __init__(self, *, command=None, env=None):
         self.stderr = tempfile.TemporaryFile(mode="w+t", encoding="utf-8")  # noqa: SIM115 - owned until close()
         self.process = subprocess.Popen(
-            [
+            command
+            or [
                 sys.executable,
                 "-c",
                 "from ida_mcp.cli import main; raise SystemExit(main())",
@@ -120,6 +121,7 @@ class MCPClient:
             stderr=self.stderr,
             text=True,
             encoding="utf-8",
+            env=env,
         )
         assert self.process.stdin is not None and self.process.stdout is not None
         self.stdin = self.process.stdin

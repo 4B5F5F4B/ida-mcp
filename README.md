@@ -14,6 +14,10 @@ Use the [IDA 8.0 installation and verification instructions](docs/IDA80.md)
 for this fork. The upstream marketplace/`uvx`/hcli commands below install
 the upstream release, not these local compatibility patches.
 
+On Windows, run **`install_one_click.bat`** to install/update the compatibility
+dependencies and GUI plugin, check MCP startup, and generate Claude-style
+`.mcp.json`. It defaults to `C:\Program Files\IDA Pro 8.0`.
+
 ## Installation
 
 ### Requirements

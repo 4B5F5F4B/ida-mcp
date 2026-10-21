@@ -4,3 +4,5 @@ __pycache__/
 .compat-research/
 dist/
 *.egg-info/
+/.mcp.json
+/.mcp.json.bak-*

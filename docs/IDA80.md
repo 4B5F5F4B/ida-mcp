@@ -19,6 +19,57 @@ Local mock tests establish specific SDK contracts; they are not an IDA 8 emulato
 
 ## Automatic background loading (ida80.4)
 
+### Windows one-click installation
+
+After pulling this checkout, save/close IDA and stop the Agent's existing MCP
+connection. Double-click **`install_one_click.bat`** in the repository root.
+It defaults to `C:\Program Files\IDA Pro 8.0` and performs:
+
+1. Locate uv, or install it using the official Astral installer if missing.
+2. Run `uv sync --locked` (uv obtains the external Python runtime if necessary).
+3. Update the GUI plugin and its private dependencies with backups.
+4. Verify the compatibility package versions and their source paths, then start
+   the exact configured MCP command and check all six tool registrations.
+5. Create/update `.mcp.json` in this repository with an `ida80` server. The uv,
+   repository and IDA paths are absolute. Existing JSON settings and other
+   servers are preserved; a changed file is backed up as `.bak-<timestamp>`.
+
+No administrator session is required for the default per-user installation.
+Keep the full repository, including `scripts` and `vendor`, alongside the BAT.
+Restart the Agent after installation. For Claude Code, start it in the project
+containing `.mcp.json`; other compatible clients can import the generated entry.
+To configure a different project or an existing Agent JSON file, run in CMD:
+
+```bat
+install_one_click.bat -ConfigPath "D:\work\my-project\.mcp.json"
+```
+
+Additional options:
+
+```bat
+rem Console-only installation, without copying the GUI plugin:
+install_one_click.bat -SkipGui
+
+rem Custom installation and GUI plugin directories:
+install_one_click.bat -IdaDir "D:\IDA Pro 8.0" -PluginsDir "D:\IDA-user\plugins"
+
+rem Also test real background loading with a disposable binary:
+install_one_click.bat -TestBinary "D:\samples\console-test.exe"
+```
+
+`-NoPause` suppresses the final Enter prompt for scripted runs; failure exits
+with a nonzero status. `-ServerName` changes the default `ida80` JSON key.
+Without `-TestBinary`, success confirms installation and MCP startup, **not**
+IDA's ability to analyze a file. With it, the installer runs `verify_ida.py` and
+writes `dist/ida80-headless-report.json`; the expected kernel defaults to `8.0`
+(`-ExpectedVersion` overrides it when validating another installed kernel).
+The script does not alter the Python runtime configured inside IDA.
+
+References: [Claude Code project MCP configuration](https://code.claude.com/docs/en/mcp#project-scope),
+[official uv installer options](https://docs.astral.sh/uv/reference/installer/).
+
+### Manual configuration
+
 Keep the modified repository on the same computer as IDA and run `uv sync --locked`.
 In Codex's existing MCP configuration, add:
 
