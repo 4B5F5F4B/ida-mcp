@@ -20,7 +20,7 @@
     },
     "requiresPython": ">=3.10",
     "pythonDependencies": [
-      "ida-nexus==0.13.4+ida80.3"
+      "ida-nexus==0.13.4+ida80.4"
     ]
   }
 }

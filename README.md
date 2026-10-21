@@ -3,10 +3,12 @@
 Official Hex-Rays IDA MCP Server, see the [announcement blog post](https://hex-rays.com/blog/hex-rays-ida-mcp-server) for more information.
 
 This checkout contains an **experimental IDA 8.0 compatibility fork**.
-It vendors and modifies IDA Nexus and IDA Domain. IDA 8 uses the GUI with
-IDAPython 3.10+; the external MCP process still needs Python 3.11+.
+It vendors and modifies IDA Nexus and IDA Domain. IDA 8 uses either GUI
+attachment or an automatically launched console worker with IDAPython 3.10+;
+the external MCP process still needs Python 3.11+.
 The modified code has passed local tests and a real IDA 9.5 MCP smoke test.
-**IDA 8.0 runtime validation is still pending on a machine with IDAPython.**
+IDA 8.0 GUI registration has been confirmed by the user. **IDA 8.0 console
+worker validation is still pending on that machine.**
 
 Use the [IDA 8.0 installation and verification instructions](docs/IDA80.md)
 for this fork. The upstream marketplace/`uvx`/hcli commands below install
@@ -20,7 +22,9 @@ the upstream release, not these local compatibility patches.
   - [Git](https://git-scm.com/)
   - [uv](https://github.com/astral-sh/uv)
 - GUI attachment: IDA 8.0+ with IDAPython 3.10+ (experimental on IDA 8)
-- Headless workers: IDA 9.4+ with idalib and Python 3.11+
+- Console workers: IDA Pro 8.0+ with IDAPython 3.10+ and `IDA_NEXUS_IDAT`
+  set to the IDA installation directory (experimental on IDA 8)
+- Library workers: IDA 9.4+ with idalib and Python 3.11+
 - We recommend disabling other IDA MCP servers to reduce agent confusion
 
 ### Automatic installation

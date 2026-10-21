@@ -458,6 +458,7 @@ class IDARuntime:
         idb_change_state: IdbChangeState,
         default_timeout: float = DEFAULT_TIMEOUT_SECONDS,
         unattributed_operation_label: str | None = None,
+        dispatcher: Callable[[Callable[[], int], int], int] | None = None,
     ) -> None:
         # Library warnings would otherwise be captured as stderr and returned
         # to the agent alongside execution output.
@@ -471,10 +472,10 @@ class IDARuntime:
         version = tuple(
             int(part) for part in idaapi.get_kernel_version().split(".")[:2]
         )
-        minimum = (8, 0) if backend == "gui" else (9, 4)
+        minimum = (9, 4) if backend == "idalib" else (8, 0)
         if version < minimum:
             raise RuntimeError(
-                "IDA Nexus requires IDA 8.0+ with IDAPython for GUI attachment; "
+                "IDA Nexus requires IDA 8.0+ with IDAPython for GUI/console hosts; "
                 "idalib workers require IDA 9.4+"
             )
 
@@ -482,6 +483,7 @@ class IDARuntime:
             raise ValueError("default_timeout must be a positive finite number")
 
         self.backend = backend
+        self._dispatcher = dispatcher
         self.database = database
         self.analysis_state = analysis_state
         self.idb_change_state = idb_change_state
@@ -497,6 +499,13 @@ class IDARuntime:
         self._active_interrupt_error: APIError | None = None
         self._session_namespaces: dict[str, dict[str, Any]] = {}
         self._idb_change_hook: Any = None
+
+    def _execute_sync(self, callback: Callable[[], int], flags: int) -> int:
+        if self._dispatcher is not None:
+            return self._dispatcher(callback, flags)
+        import ida_kernwin
+
+        return ida_kernwin.execute_sync(callback, flags)
 
     def _interrupt_active(
         self,
@@ -705,7 +714,7 @@ class IDARuntime:
                 return 1
 
             try:
-                ida_kernwin.execute_sync(invoke, ida_kernwin.MFF_WRITE)
+                self._execute_sync(invoke, ida_kernwin.MFF_WRITE)
                 if outcome is None:
                     raise APIError(
                         "execute_sync_failed",
@@ -784,7 +793,7 @@ class IDARuntime:
                 self._idb_change_hook = hook
             return 1
 
-        ida_kernwin.execute_sync(install, ida_kernwin.MFF_FAST)
+        self._execute_sync(install, ida_kernwin.MFF_FAST)
         if self._idb_change_hook is None:
             raise RuntimeError("IDA did not install the database-change hook")
 
@@ -799,7 +808,7 @@ class IDARuntime:
                 self._idb_change_hook = None
             return 1
 
-        ida_kernwin.execute_sync(uninstall, ida_kernwin.MFF_FAST)
+        self._execute_sync(uninstall, ida_kernwin.MFF_FAST)
         if self._idb_change_hook is not None:
             raise RuntimeError("IDA did not remove the database-change hook")
 

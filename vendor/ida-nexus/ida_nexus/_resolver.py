@@ -293,12 +293,17 @@ def spawn_worker(
     lease_grace: float,
     options: WorkerLaunchOptions | None = None,
 ) -> tuple[subprocess.Popen[bytes], Path]:
+    options = options or WorkerLaunchOptions()
+    environment = os.environ if options.worker_env is None else options.worker_env
+    if environment.get("IDA_NEXUS_IDAT"):
+        from ._idat import spawn_idat
+
+        return spawn_idat(source, expected_idb, lease_grace, options)
     suffix = os.urandom(3).hex()
     try:
         executable = _find_console_script("ida-nexus")
     except FileNotFoundError as error:
         raise DatabaseOpenError(str(error)) from error
-    options = options or WorkerLaunchOptions()
     command = _build_worker_command(
         source,
         expected_idb,
@@ -373,6 +378,15 @@ def _launcher_exit_is_fatal(returncode: int, platform: str) -> bool:
     return platform != "nt" or returncode != 0
 
 
+def _is_console_worker(process: subprocess.Popen[bytes]) -> bool:
+    command = getattr(process, "args", None)
+    return bool(
+        isinstance(command, (list, tuple))
+        and command
+        and Path(command[0]).stem.lower() in ("idat", "idat64")
+    )
+
+
 def _await_ready(
     process: subprocess.Popen[bytes],
     expected_idb: str,
@@ -390,7 +404,7 @@ def _await_ready(
         now = time.monotonic()
         if now >= deadline:
             tail = _log_tail(actual_log_path)
-            message = f"timed out waiting for idalib worker {process.pid}"
+            message = f"timed out waiting for IDA worker {process.pid}"
             if last_detail:
                 message += f": {last_detail}"
             if tail:
@@ -431,11 +445,12 @@ def _await_ready(
             # uv/pip console-script launchers on Windows can exit successfully
             # after starting the real Python worker under a different PID. The
             # suffix remains authoritative, so keep waiting for its record.
-            if _launcher_exit_is_fatal(returncode, os.name):
+            if _is_console_worker(process) or _launcher_exit_is_fatal(
+                returncode, os.name
+            ):
                 tail = _log_tail(actual_log_path)
                 message = (
-                    f"idalib worker launcher {process.pid} exited with status "
-                    f"{returncode}"
+                    f"IDA worker launcher {process.pid} exited with status {returncode}"
                 )
                 if tail:
                     message += f"\n\n{tail}"
@@ -619,6 +634,18 @@ def resolve_instance(
             lease_grace,
             launch_options,
         )
-        return _await_ready(process, expected_idb, log_path, deadline)
+        try:
+            return _await_ready(process, expected_idb, log_path, deadline)
+        except BaseException:
+            # Unlike a Windows Python launcher, idat is the owning process.
+            # A failed/expired startup must not leave a hidden database owner.
+            if _is_console_worker(process) and process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+            raise
     finally:
         spawn_lock.close()

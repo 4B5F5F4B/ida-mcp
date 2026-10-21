@@ -6,14 +6,97 @@ The target is **IDA Pro 8.0 with IDAPython**. IDA Freeware 8.0 was used
 as a reference binary; this project does not supply its missing IDAPython
 plugin. The Python MCP entry point cannot run inside that Freeware installation.
 
-IDA 8.0 GUI uses IDAPython with Python 3.10 or newer. The MCP server runs
-in a separate Python 3.11+ environment. IDA 8 has no idalib, so first open
-the target in its GUI. Automatic headless worker creation remains a
-feature of IDA 9.4+.
+IDA 8.0 uses IDAPython with Python 3.10 or newer. The MCP server runs
+in a separate Python 3.11+ environment. For automatic background loading,
+configure `IDA_NEXUS_IDAT` as described below. The server then starts a console
+IDA worker; opening the input in the GUI is no longer required. Leaving this
+variable unset preserves GUI attachment and the existing IDA 9.4+ idalib path.
 
-Actual IDA 8.0 execution has **not yet been verified**. That installation
-is on another computer. Local mock tests only establish specific SDK
-fallback contracts; they are not an IDA 8 emulator.
+The user confirmed IDA 8.0 GUI database registration on the other computer.
+**The new console backend still needs end-to-end validation on actual IDA 8.0.**
+It has been tested with a real IDA 9.5 console host, without idalib or a GUI.
+Local mock tests establish specific SDK contracts; they are not an IDA 8 emulator.
+
+## Automatic background loading (ida80.4)
+
+Keep the modified repository on the same computer as IDA and run `uv sync --locked`.
+In Codex's existing MCP configuration, add:
+
+```toml
+[mcp_servers.ida80.env]
+IDA_NEXUS_IDAT = 'C:\Program Files\IDA Pro 8.0'
+```
+
+Restart the Agent/MCP connection. Its `command` and `args` must still run this
+local checkout, for example `uv --directory D:\code\ida-mcp run --locked ida-mcp stdio`.
+For clients using JSON, set the same variable in that server's `env` object.
+No GUI plugin installation is needed for the console worker; the launcher loads
+the local dependency forks directly into IDAPython.
+
+The directory selects `idat64.exe` first for new `.i64` databases and `idat.exe`
+for existing `.idb` databases. A full console executable path is also accepted.
+The executable must be present and have working IDAPython and an IDA Pro license.
+An already registered GUI database is reused if it matches the requested file.
+
+Now call `open_database(path="D:\\samples\\program.exe")`. The result should
+contain `backend: "idat"` when a worker is spawned. `execute_python` waits for
+analysis through the existing MCP barrier. Several clients share one worker for
+the same database; different databases use separate processes. Final lease
+release saves the database and exits the worker. Normal `close_database` does
+not close unrelated GUI instances.
+
+To verify without opening any GUI, copy a small executable to a fresh directory
+(with no existing database), then run:
+
+```powershell
+uv run python scripts/verify_ida.py `
+  --database 'D:\samples\console-test.exe' `
+  --idat 'C:\Program Files\IDA Pro 8.0' `
+  --expect-version 8.0 --headless-only --output ida80-headless-report.json
+
+uv run python scripts/verify_idat_lifecycle.py `
+  --binary 'D:\samples\console-test.exe' `
+  --idat 'C:\Program Files\IDA Pro 8.0' `
+  --expect-version 8.0 --output ida80-lifecycle-report.json
+```
+
+The second script makes disposable copies and checks sharing, independent
+workers, cancellation by timeout, saving/reopening, discarding changes, and idle
+shutdown. Reports and logs identify the actual kernel version. Passing on IDA
+9.5 does not substitute for the IDA 8.0 run.
+
+Implementation: the existing idalib worker imports `idapro`, opens a database
+with `Database.open()`, and uses `ida_kernwin.serve()` (9.4+) for main-thread
+dispatch. The new worker starts `idat64 -A -a -S... input`, loads the database
+through IDA's normal loader, and attaches with `Database.open()` inside that
+process. A Python queue dispatches every operation on the script's main thread;
+the existing Nexus HTTP server, authenticated registry, lease watchdog, and
+analysis scheduler are reused. Analysis advances in bounded native steps.
+Windows uses `CREATE_NO_WINDOW`; no GUI window or manual file-open step is used.
+See the official [command-line guide](https://hex-rays.com/blog/igor-tip-of-the-week-07-ida-command-line-options-cheatsheet).
+
+`-B` is deliberately not used: it exits after generating assembly instead of
+keeping a service alive. The console backend reserves `-S` for the service and
+rejects `script_file`, `run_debugger`, and named `debug_flags` before launching;
+use `execute_python` for scripts and numeric masks for debug flags. Other loader
+options use the existing open options, with import-only switches omitted when
+reopening an IDB. Startup diagnostics are under the Nexus `logs` directory;
+failed or timed-out direct console starts are terminated. The worker uses the
+Python runtime configured in IDA, not the MCP virtual environment.
+
+Local validation for this revision:
+
+- Root suite: 196 tests and 8 subtests; Python 3.10 compatibility subset: 52 tests.
+- Nexus runtime/lifecycle suite: 362 passed, 4 skipped. Its original release
+  version test was excluded because it rejects local `+ida80` version suffixes;
+  the root version/dependency checker passes. Real idalib tests use the explicit
+  smoke run below instead of the upstream environment-specific E2E suite.
+- [Fresh console MCP run on IDA 9.5](validation/ida95-idat-smoke.json).
+- [Console lifecycle run on IDA 9.5](validation/ida95-idat-lifecycle.json).
+- [Original idalib MCP regression on IDA 9.5](validation/ida95-idalib-regression.json).
+- Root Ruff, formatting, type, and version checks pass.
+
+These reports are local IDA 9.5 evidence, not confirmation of IDA 8.0 console behavior.
 
 The `ida80.2` revision fixes the reported IDA 8 startup failure
 `cannot import name 'ea_t' from 'ida_idaapi'`. Address annotations now use

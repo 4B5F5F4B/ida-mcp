@@ -52,8 +52,8 @@ def install(plugins: Path):
             check=True,
         )
         manifest = {
-            "ida-nexus": "0.13.4+ida80.3",
-            "ida-domain": "0.5.1+ida80.3",
+            "ida-nexus": "0.13.4+ida80.4",
+            "ida-domain": "0.5.1+ida80.4",
             "minimum_ida": "8.0",
             "minimum_python": "3.10",
         }

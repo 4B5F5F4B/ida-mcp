@@ -1,0 +1,34 @@
+{
+  "kernel": "9.5",
+  "python": "3.11.9 (tags/v3.11.9:de54cf5, Apr  2 2024, 10:12:12) [MSC v.1938 64 bit (AMD64)]",
+  "domain_source": "D:\\code\\ida-mcp\\vendor\\ida-domain\\ida_domain\\__init__.py",
+  "nexus_source": "D:\\code\\ida-mcp\\vendor\\ida-nexus\\ida_nexus\\__init__.py",
+  "functions": 103,
+  "first_function": "pre_c_init",
+  "segments": 8,
+  "strings": 138,
+  "xrefs_to_first_function": 3,
+  "named_types": 63,
+  "numbered_types": 63,
+  "decompiler": {
+    "available": true,
+    "lines": 43
+  },
+  "comment_write_and_restore": true,
+  "byte_search": {
+    "first_match": 5368713232,
+    "all_match_count": 1
+  },
+  "operand_paths_read": 2,
+  "function_type_arguments": 1,
+  "xref_filter_checks": 8,
+  "save": {
+    "path": "D:\\code\\ida-mcp\\.compat-research\\idat test\\fresh sample.exe.i64"
+  },
+  "close": {
+    "closed": true
+  },
+  "backend": "idat",
+  "transport": "MCP stdio",
+  "success": true
+}

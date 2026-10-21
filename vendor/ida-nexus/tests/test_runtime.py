@@ -344,6 +344,7 @@ def test_execute_user_code_preserves_ordinary_broad_exception_handlers() -> None
 def _inline_runtime(monkeypatch: pytest.MonkeyPatch) -> IDARuntime:
     monkeypatch.setitem(__import__("sys").modules, "ida_domain", SimpleNamespace())
     runtime = object.__new__(IDARuntime)
+    runtime._dispatcher = None
     runtime.database = object()
     runtime.default_timeout = 60.0
     runtime._session_namespaces = {}

@@ -54,7 +54,7 @@ def _entry_target_fields(entry: DatabaseInstance) -> dict[str, Any]:
         "started_at": entry.started_at,
         "worker_log_path": (
             str(LOG_DIR / f"{entry.record_id}.log")
-            if entry.backend == "idalib"
+            if entry.backend in ("idalib", "idat")
             else None
         ),
     }
@@ -62,7 +62,7 @@ def _entry_target_fields(entry: DatabaseInstance) -> dict[str, Any]:
 
 class OpenDatabaseResult(TypedDict):
     instance_id: str
-    backend: Annotated[str, "Instance backend: gui or idalib."]
+    backend: Annotated[str, "Instance backend: gui, idalib, or idat."]
     status: Annotated[str, "Attachment state: attached or current."]
     recovery: Annotated[
         str,

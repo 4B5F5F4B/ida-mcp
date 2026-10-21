@@ -20,7 +20,7 @@
     "tools": [
       {
         "name": "open_database",
-        "description": "Open (load) a binary executable, shared library, firmware image, or an\nexisting .i64/.idb IDA database in IDA Pro for reverse engineering. Runs IDA\nauto-analysis (functions, disassembly, cross references, strings) in a headless\nidalib worker, or attaches to the file already open in the IDA GUI. Call this\nfirst, then use execute_python to decompile, disassemble and query the binary.\nload_options apply only when a new headless worker is spawned; they do not\nchange an already-open IDA GUI database or a reused worker.",
+        "description": "Open (load) a binary executable, shared library, firmware image, or an\nexisting .i64/.idb IDA database in IDA Pro for reverse engineering. Runs IDA\nauto-analysis (functions, disassembly, cross references, strings) in a headless\nworker (idat when IDA_NEXUS_IDAT is configured, otherwise idalib), or attaches\nto the file already open in the IDA GUI. Call this\nfirst, then use execute_python to decompile, disassemble and query the binary.\nload_options apply only when a new headless worker is spawned; they do not\nchange an already-open IDA GUI database or a reused worker.",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -79,7 +79,7 @@
             },
             "backend": {
               "type": "string",
-              "description": "Instance backend: gui or idalib."
+              "description": "Instance backend: gui, idalib, or idat."
             },
             "status": {
               "type": "string",
@@ -215,7 +215,7 @@
                   },
                   "backend": {
                     "type": "string",
-                    "description": "Instance backend: gui or idalib."
+                    "description": "Instance backend: gui, idalib, or idat."
                   },
                   "status": {
                     "type": "string",

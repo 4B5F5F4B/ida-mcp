@@ -684,7 +684,8 @@ def open_database(
     """Open (load) a binary executable, shared library, firmware image, or an
     existing .i64/.idb IDA database in IDA Pro for reverse engineering. Runs IDA
     auto-analysis (functions, disassembly, cross references, strings) in a headless
-    idalib worker, or attaches to the file already open in the IDA GUI. Call this
+    worker (idat when IDA_NEXUS_IDAT is configured, otherwise idalib), or attaches
+    to the file already open in the IDA GUI. Call this
     first, then use execute_python to decompile, disassemble and query the binary.
     load_options apply only when a new headless worker is spawned; they do not
     change an already-open IDA GUI database or a reused worker.
@@ -921,7 +922,7 @@ def list_databases() -> ListDatabasesToolResult:
     IDA GUI or in headless idalib workers, with their instance ids.
     """
     result = ListDatabasesToolResult(**DATABASE_MANAGER.list_databases())
-    if not _gui_plugin_installed():
+    if not os.environ.get("IDA_NEXUS_IDAT") and not _gui_plugin_installed():
         result["hint"] = (
             "To enable GUI database discovery: uvx ida-hcli plugin install https://github.com/HexRaysSA/ida-mcp"
         )

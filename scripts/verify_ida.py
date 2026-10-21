@@ -2,13 +2,15 @@
 
 Usage:
   uv run python scripts/verify_ida.py --database sample.exe --expect-version 8.0 --gui-only
-For IDA 8, first open that sample in IDA and load the patched GUI plugin.
+For GUI mode, first open the sample in IDA and load the patched plugin.
+For console mode, use --idat INSTALL_DIR --headless-only; no GUI is required.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import queue
 import subprocess
 import sys
@@ -23,8 +25,8 @@ from importlib.metadata import version
 import idaapi, ida_bytes, ida_funcs, ida_name, ida_typeinf
 from ida_domain.types import TypeKind
 from ida_domain.xrefs import XrefsFlags
-assert __import__("ida_domain").__version__ == "0.5.1+ida80.3", "Wrong ida-domain fork loaded"
-assert version("ida-nexus") == "0.13.4+ida80.3", "Wrong ida-nexus fork loaded"
+assert __import__("ida_domain").__version__ == "0.5.1+ida80.4", "Wrong ida-domain fork loaded"
+assert version("ida-nexus") == "0.13.4+ida80.4", "Wrong ida-nexus fork loaded"
 
 functions = list(db.functions)
 assert functions, "The test binary must contain analyzed functions"
@@ -192,9 +194,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--expect-version", required=True)
-    parser.add_argument("--gui-only", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--gui-only", action="store_true")
+    mode.add_argument("--headless-only", action="store_true")
+    parser.add_argument(
+        "--idat", type=Path, help="Console executable or IDA installation directory"
+    )
     parser.add_argument("--output", type=Path, default=Path("ida-compat-report.json"))
     args = parser.parse_args()
+    if args.idat:
+        os.environ["IDA_NEXUS_IDAT"] = str(args.idat.resolve(strict=True))
     path = args.database.resolve(strict=True)
     client = MCPClient()
     try:
@@ -218,8 +227,6 @@ def main():
             "close_database",
         }
         if args.gui_only:
-            import os
-
             target = os.path.normcase(str(path))
             instances = client.call("list_databases", {})["instances"]
             if not any(
@@ -233,6 +240,8 @@ def main():
         opened = client.call("open_database", {"path": str(path)})
         if args.gui_only and opened["backend"] != "gui":
             raise RuntimeError("Expected an IDA GUI database")
+        if args.headless_only and opened["backend"] != "idat":
+            raise RuntimeError("Expected an automatically launched idat database")
         instance = opened["instance_id"]
         kernel = client.call(
             "execute_python",

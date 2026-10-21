@@ -25,7 +25,7 @@ SPAWN_DIR = STATE_DIR / "spawn"
 LOG_DIR = STATE_DIR / "logs"
 PROTOCOL_VERSION = 9
 DEFAULT_TIMEOUT = 1.0
-BackendName = Literal["gui", "idalib"]
+BackendName = Literal["gui", "idalib", "idat"]
 
 
 def _event_origin_id(lease_id: str) -> str:
@@ -363,7 +363,7 @@ def load_registry_entry(path: str | os.PathLike[str]) -> DatabaseInstance:
         raise TypeError("registry entry has an invalid record ID")
     if record_id != entry_path.stem:
         raise ValueError("record ID does not match its filename")
-    if payload["backend"] not in ("gui", "idalib"):
+    if payload["backend"] not in ("gui", "idalib", "idat"):
         raise ValueError("registry entry has an invalid backend")
     if (
         not isinstance(payload["pid"], int)

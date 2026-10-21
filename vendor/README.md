@@ -6,8 +6,8 @@ Keep their original license files with redistributed copies.
 
 | Package | Upstream version | Source SHA-256 | Local version |
 |---|---|---|---|
-| ida-nexus | 0.13.4 | `850fd732f478787306b50d4639b63edc5e510978d089d2e552be7e27655babb0` | 0.13.4+ida80.3 |
-| ida-domain | 0.5.1 | `c49f2c417047d882e954f651b50a709a3f27903b33ba533b794aa54d6536d16f` | 0.5.1+ida80.3 |
+| ida-nexus | 0.13.4 | `850fd732f478787306b50d4639b63edc5e510978d089d2e552be7e27655babb0` | 0.13.4+ida80.4 |
+| ida-domain | 0.5.1 | `c49f2c417047d882e954f651b50a709a3f27903b33ba533b794aa54d6536d16f` | 0.5.1+ida80.4 |
 
 Sources:
 

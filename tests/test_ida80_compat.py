@@ -218,6 +218,16 @@ def test_library_detection_without_idalib(monkeypatch, probe, expected):
     assert load_helper("_compat_runtime").is_ida_library() is expected
 
 
+def test_console_host_does_not_import_second_kernel(monkeypatch):
+    monkeypatch.setattr(sys, "executable", "C:/IDA/idat64.exe")
+    monkeypatch.setitem(
+        sys.modules,
+        "ida_kernwin",
+        types.SimpleNamespace(is_ida_library=lambda *args: True),
+    )
+    assert load_helper("_compat_runtime").is_ida_library() is False
+
+
 def test_byte_search_uses_legacy_compiled_pattern_overload(monkeypatch):
     sdk: Any = types.ModuleType("ida_bytes")
     sdk.BIN_SEARCH_FORWARD = 1
@@ -608,6 +618,8 @@ def test_gui_detection(monkeypatch, is_qt, interactive, library, expected):
     "version, backend, supported",
     [
         ("8.0", "gui", True),
+        ("8.0", "idat", True),
+        ("7.7", "idat", False),
         ("8.0", "idalib", False),
         ("7.7", "gui", False),
         ("9.4", "idalib", True),

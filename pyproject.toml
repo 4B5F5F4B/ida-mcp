@@ -8,8 +8,8 @@ license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "packaging",
-    "ida-nexus==0.13.4+ida80.3",
-    "ida-domain[idalib]==0.5.1+ida80.3",
+    "ida-nexus==0.13.4+ida80.4",
+    "ida-domain[idalib]==0.5.1+ida80.4",
     "zeromcp>=1.10.3",
 ]
 

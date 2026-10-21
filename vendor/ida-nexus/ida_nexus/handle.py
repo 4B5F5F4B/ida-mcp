@@ -274,7 +274,7 @@ class DatabaseHandle:
         self.idle_timeout = (
             float(idle_timeout)
             if idle_timeout is not None
-            and instance.backend == "idalib"
+            and instance.backend in ("idalib", "idat")
             and instance.managed
             else None
         )
