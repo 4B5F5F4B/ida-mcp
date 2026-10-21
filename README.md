@@ -30,12 +30,12 @@
 | --- | --- |
 | 操作系统 | Windows；一键脚本使用系统自带的 Windows PowerShell |
 | IDA | 已安装并可运行的 **IDA 8.0 Pro**，默认目录为 `C:\Program Files\IDA Pro 8.0` |
-| IDAPython | 在 IDA 内使用 Python **3.10 或更新版本** |
+| IDAPython | IDA 内部使用 Python **3.11.x**；更高版本可能不兼容 |
 | 后台模式 | 安装目录中存在 `idat64.exe` 或 `idat.exe`，且能加载 IDAPython |
 | 外部 MCP 服务 | Python **3.11+**；`uv` 按仓库配置准备运行环境 |
 | Agent | 支持标准 stdio MCP，配置格式使用 `mcpServers` |
 
-IDA 内嵌 Python 与外部 MCP 的 Python 是两个独立环境。安装脚本不会修改 IDA 的 Python 绑定；需要调整时，请使用对应 IDA 安装目录中的 `idapyswitch`。
+IDA 内嵌 Python 与外部 MCP 的 Python 是两个独立环境。请将 IDA 内部的 Python 绑定到 **3.11.x**，更高版本可能与该 IDAPython 组件不兼容；外部 MCP 服务仍按上表中的独立要求配置。安装脚本不会修改 IDA 的 Python 绑定；需要调整时，请使用对应 IDA 安装目录中的 `idapyswitch`。
 
 本项目不为 IDA Freeware 8.0 提供其缺失的 IDAPython。默认部署要求 **Agent、MCP 服务和 IDA 位于同一台 Windows 电脑，并使用同一用户运行**。
 
