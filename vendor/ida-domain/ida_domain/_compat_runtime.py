@@ -9,6 +9,12 @@ from pathlib import Path
 def is_ida_library() -> bool:
     import ida_kernwin
 
+    # IDAPython initializes this marker in embedded GUI/console hosts. With
+    # IDAPYTHON_VENV_EXECUTABLE, sys.executable can name python.exe instead of
+    # idat.exe, so executable-name detection alone would load a second kernel.
+    if getattr(sys.modules.get('__main__'), 'IDAPYTHON_VERSION', None) is not None:
+        return False
+
     # Modern console hosts may themselves use the library UI shim. They still
     # own an already-open database; importing idapro would load a second kernel.
     if Path(sys.executable).stem.lower() in ('idat', 'idat64'):

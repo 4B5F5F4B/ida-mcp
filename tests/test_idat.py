@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,6 +19,7 @@ from ida_nexus._registry import (
     load_registry_entry,
 )
 from ida_nexus._resolver import WorkerLaunchOptions, _build_worker_command
+from ida_nexus._runtime import AnalysisState, APIError, IDARuntime, IdbChangeState
 from ida_nexus.cli.worker import _parser
 from ida_nexus.errors import DatabaseOpenError
 
@@ -157,6 +160,108 @@ def test_dispatcher_marshals_to_owner_and_propagates_failure():
     assert not thread.is_alive()
     with pytest.raises(RuntimeError, match="stopping"):
         dispatcher(lambda: 42)
+
+
+@pytest.fixture
+def console_runtime(monkeypatch):
+    """Model a console with no native event pump, using the real dispatcher."""
+    ready = threading.Event()
+    holder = {}
+
+    def require_owner():
+        assert threading.get_ident() == holder["dispatcher"].owner, (
+            "native UI calls from a worker would wait for the unpumped IDA queue"
+        )
+
+    def native_dispatch(*_args):
+        raise AssertionError("console operations must use the Python dispatcher")
+
+    monkeypatch.setitem(sys.modules, "ida_domain", SimpleNamespace())
+    monkeypatch.setitem(
+        sys.modules, "idaapi", SimpleNamespace(get_kernel_version=lambda: "8.0")
+    )
+    monkeypatch.setitem(sys.modules, "idc", SimpleNamespace(batch=lambda _value: 0))
+    monkeypatch.setitem(
+        sys.modules,
+        "ida_kernwin",
+        SimpleNamespace(
+            MFF_FAST=0,
+            MFF_WRITE=2,
+            clr_cancelled=require_owner,
+            set_cancelled=require_owner,
+            execute_sync=native_dispatch,
+        ),
+    )
+
+    def main_thread():
+        holder["dispatcher"] = MainThreadDispatcher()
+        ready.set()
+        holder["dispatcher"].serve()
+
+    thread = threading.Thread(target=main_thread, daemon=True)
+    thread.start()
+    assert ready.wait(2)
+    runtime = IDARuntime(
+        backend="idat",
+        database=object(),
+        analysis_state=AnalysisState(),
+        idb_change_state=IdbChangeState(),
+        dispatcher=holder["dispatcher"],
+    )
+    try:
+        with ThreadPoolExecutor(max_workers=1) as requests:
+            yield runtime, requests
+    finally:
+        holder["dispatcher"].stop()
+        thread.join(timeout=2)
+    assert not thread.is_alive()
+
+
+def test_console_analysis_cleanup_and_repeated_python_requests(console_runtime):
+    runtime, requests = console_runtime
+    # Startup analysis used to get stuck after its first completed slice,
+    # retaining the operation lock and preventing even hello from running.
+    assert requests.submit(
+        runtime._run_sync, lambda: True, kind="analysis_slice", timeout=None
+    ).result(timeout=2)
+    for _ in range(2):
+        result = requests.submit(runtime.execute_python, 'print("hello")', 1).result(
+            timeout=2
+        )
+        assert result["stdout"] == "hello\n"
+    with pytest.raises(APIError, match="division by zero"):
+        requests.submit(runtime.execute_python, "1 / 0", 1).result(timeout=2)
+    assert (
+        requests.submit(runtime.execute_python, "6 * 7", 1).result(timeout=2)["result"]
+        == 42
+    )
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_console_interrupt_and_recovery_without_native_pump(console_runtime, cancel):
+    runtime, requests = console_runtime
+    started = threading.Event()
+
+    def operation():
+        started.set()
+        # A finite native wait also verifies interruption on returning to Python.
+        time.sleep(0.2)
+
+    pending = requests.submit(
+        runtime._run_sync, operation, kind="execute", timeout=None if cancel else 0.03
+    )
+    assert started.wait(2)
+    if cancel:
+        runtime.cancel_active()
+    with pytest.raises(APIError) as error:
+        pending.result(timeout=2)
+    assert error.value.code == (
+        "operation_cancelled" if cancel else "operation_timeout"
+    )
+    assert (
+        requests.submit(runtime.execute_python, "40 + 2", 1).result(timeout=2)["result"]
+        == 42
+    )
 
 
 def test_idat_registry_round_trip(tmp_path):

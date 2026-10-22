@@ -245,6 +245,34 @@ def main():
         if args.headless_only and opened["backend"] != "idat":
             raise RuntimeError("Expected an automatically launched idat database")
         instance = opened["instance_id"]
+        # Exercise the exact first-call regression through MCP: this also
+        # waits for initial analysis on a newly created console database.
+        for _ in range(2):
+            hello = client.call(
+                "execute_python",
+                {"code": 'print("hello")', "instance_id": instance, "timeout": 10},
+            )
+            assert hello["stdout"] == "hello\n", hello
+            assert not hello["stderr"], hello
+        if args.headless_only:
+            try:
+                client.call(
+                    "execute_python",
+                    {
+                        "code": "while True: pass",
+                        "instance_id": instance,
+                        "timeout": 0.2,
+                    },
+                )
+            except RuntimeError as exc:
+                assert "execute timed out" in str(exc), str(exc)
+            else:
+                raise AssertionError("Python loop was not interrupted")
+            recovered = client.call(
+                "execute_python",
+                {"code": "40 + 2", "instance_id": instance, "timeout": 10},
+            )
+            assert recovered["result"] == 42, recovered
         kernel = client.call(
             "execute_python",
             {
@@ -271,6 +299,8 @@ def main():
         report["close"] = client.call("close_database", {"instance_id": instance})
         report["backend"] = opened["backend"]
         report["transport"] = "MCP stdio"
+        report["hello_calls"] = 2
+        report["timeout_recovery_checked"] = args.headless_only
         report["success"] = True
         args.output.write_text(
             json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"

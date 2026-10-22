@@ -149,6 +149,43 @@ Local validation for this revision:
 
 These reports are local IDA 9.5 evidence, not confirmation of IDA 8.0 console behavior.
 
+### Headless timeout repair (2026-10-22)
+
+The console dispatcher now also handles the final `clr_cancelled()` cleanup on
+the IDA main thread. Previously that cleanup ran on the HTTP/analysis thread;
+the helper can wait on IDA's native UI queue, which the console's Python request
+pump does not serve. A stalled startup analysis slice could therefore retain the
+backend lock and prevent even `print("hello")` from executing.
+
+Console cancellation no longer calls `set_cancelled()` from a background thread
+while holding the runtime lock. It uses Python interruption, including between
+native autoanalysis steps. A single long native call must still return to Python
+before that interruption takes effect; the execution timeout is not a hard kill
+of arbitrary native code. GUI and idalib cancellation retain their existing paths.
+
+Embedded-host detection also recognizes IDAPython's `__main__.IDAPYTHON_VERSION`
+marker. This prevents importing a second kernel when a configured IDAPython
+virtual environment makes `sys.executable` refer to `python.exe` in a console host.
+
+Validation on this checkout:
+
+- Root suite: 208 tests and 8 subtests passed. New console regression tests use
+  the real dispatcher and reject UI calls made outside its owner thread; the
+  analysis-cleanup test failed at the original off-thread `clr_cancelled()` call
+  before the repair. Tests also cover repeated execution, errors, cancellation,
+  execution timeout, and reuse after interruption.
+- Nexus runtime, HTTP server, manager, handle, and lease suites: 167 tests passed.
+- [Real IDA 9.5 MCP stdio run](validation/ida95-idat-timeout-fix.json):
+  `open_database` on a fresh EXE, two hello calls, Python-loop timeout and
+  recovery, analysis queries, decompilation, save, and close.
+- [Real IDA 9.5 console lifecycle run](validation/ida95-idat-timeout-fix-lifecycle.json):
+  sharing, independent workers, timeout recovery, save/reopen, discard, and idle exit.
+
+Restart the MCP service and existing console workers after updating the checkout;
+already-running workers retain imported code. The `verify_ida.py` command above
+now includes hello and timeout-recovery checks. Run it with `--expect-version 8.0`
+and `--headless-only` on the target machine: IDA 8.0 itself remains unverified here.
+
 The `ida80.2` revision fixes the reported IDA 8 startup failure
 `cannot import name 'ea_t' from 'ida_idaapi'`. Address annotations now use
 a package-local `int` alias, including the hook definitions evaluated at

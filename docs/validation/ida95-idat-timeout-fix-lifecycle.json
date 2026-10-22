@@ -1,0 +1,14 @@
+{
+  "work_directory": "C:\\Users\\kangk\\AppData\\Local\\Temp\\ida-console-test-xs1vkr6n",
+  "success": true,
+  "checks": [
+    "fresh load and explicit analysis",
+    "shared worker survives first client close",
+    "separate input gets independent worker",
+    "timed out execution leaves worker usable",
+    "final close saves and releases packed database",
+    "reopen preserves saved data and shutdown discards unsaved edit",
+    "idle lease expires and shuts down worker"
+  ],
+  "kernel": "9.5"
+}

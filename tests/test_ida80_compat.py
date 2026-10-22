@@ -570,6 +570,19 @@ def test_local_type_ordinals_need_no_enable_api(monkeypatch):
     load_helper("_compat_types").enable_numbered_types(object())
 
 
+def test_console_virtualenv_does_not_load_second_kernel(monkeypatch):
+    monkeypatch.setattr(sys, "executable", "C:/IDA/venv/Scripts/python.exe")
+    monkeypatch.setitem(
+        sys.modules, "__main__", types.SimpleNamespace(IDAPYTHON_VERSION=(9, 5, 0))
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "ida_kernwin",
+        types.SimpleNamespace(is_ida_library=lambda *a: True),
+    )
+    assert load_helper("_compat_runtime").is_ida_library() is False
+
+
 def test_vendored_runtime_parses_on_python_310():
     for package in (DOMAIN, ROOT / "vendor/ida-nexus/ida_nexus"):
         for file in package.rglob("*.py"):

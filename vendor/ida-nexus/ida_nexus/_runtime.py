@@ -527,8 +527,13 @@ class IDARuntime:
                 return
             self._active_interrupt_error = error
             self._active_cancel_event.set()
-            if self.backend != "gui":
+            if self.backend == "idalib":
                 ida_kernwin.set_cancelled()
+            # idat's -S thread pumps our Python queue, not IDA's native UI
+            # queue. set_cancelled() can marshal through native execute_sync
+            # and block here while holding _active_lock. Interrupt Python
+            # directly instead; analysis returns to Python between steps.
+            # A monolithic native call can only unwind once it returns.
             if self._active_thread_id is not None:
                 _interrupt_thread(self._active_thread_id)
 
@@ -730,7 +735,17 @@ class IDARuntime:
                         self._active_thread_id = None
                         self._active_interrupt_error = None
                 # Defend against a timeout racing with deadline cancellation.
-                ida_kernwin.clr_cancelled()
+                if self.backend == "idat":
+                    # Even this UI helper can use native execute_sync when
+                    # called off-thread. Marshal through the console pump,
+                    # just like invoke(), before releasing the operation lock.
+                    def clear_cancelled() -> int:
+                        ida_kernwin.clr_cancelled()
+                        return 1
+
+                    self._execute_sync(clear_cancelled, ida_kernwin.MFF_FAST)
+                else:
+                    ida_kernwin.clr_cancelled()
 
         if succeeded:
             if capture_output:
